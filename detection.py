@@ -38,13 +38,16 @@ def make_coords(image, line_params):
     return np.array([x1, y1, x2, y2])
 
 
+# line : y=mx+b -> m=slope, b=intercept
+# we can avarage the m,b values to a single line
+# first we have to separate the coordinates, which belongs to the left and right line
 def avarage_slope_intercept(image, lines):
-    left_fit = []
-    right_fit = []
+    left_fit = [] # coordinates of the left line
+    right_fit = [] # coordinates of the right line
     if lines is not None:
-        for line in lines:
-            x1, y1, x2, y2 = line.reshape(4)
-            params = np.polyfit((x1, x2), (y1, y2), 1)
+        for line in lines: # loop through the lines
+            x1, y1, x2, y2 = line.reshape(4) # endpoints of a line
+            params = np.polyfit((x1, x2), (y1, y2), 1) # makes a polynomial fuction which from the endpoints
             slope = params[0]
             intercept = params[1]
             if slope < 0:

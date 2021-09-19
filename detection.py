@@ -1,6 +1,49 @@
 import numpy as np
 import cv2 as cv
 import matplotlib.pylab as plt
+import glob
+import pickle
+import os
+
+def calibrate_camera(image_files, nx, ny):
+    objpoints = []
+    imgpoints = []
+    objp = np.zeros(shape=(nx * ny, 3), dtype=np.float32)
+    gray = None
+    objp[:, :2] = np.mgrid[0:nx, 0:ny].T.reshape(-1, 2)
+    for i in image_files:
+        img = cv.imread(i)
+        if img.shape[0] != 720:
+            img = cv.resize(img,(1280, 720))
+        cv.imshow('image',img)
+        gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+        ret, corners = cv.findChessboardCorners(gray, (nx, ny))
+        if ret:
+            print("Calibrated!")
+            imgpoints.append(corners)
+            objpoints.append(objp)
+    return cv.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
+
+def undistort_camera():
+    out_examples = 0
+    MOV_AVG_LENGTH = 5
+
+    if not os.path.exists('calibration.p'):
+        # Read all jpg files from calibration image folder
+        images = glob.glob('camera_cal/*.jpg')
+        with open('calibration.p', mode='wb') as f:
+            ret, mtx, dist, rvecs, tvecs = calibrate_camera(images, nx=9, ny=6)
+            pickle.dump([ret, mtx, dist, rvecs, tvecs], f)
+            f.close()
+    else:
+        with open('calibration.p', mode='rb') as f:
+            ret, mtx, dist, rvecs, tvecs = pickle.load(f)
+            f.close()
+    if out_examples:
+        # output undistorted image to output_image
+        to_calibrate = cv.imread('camera_cal/calibration3.jpg')
+        cv.imsave('output_images/calibration3_calibrated.jpg', cv.undistort(to_calibrate, mtx, dist, None, mtx))
+    return mtx, dist
 
 
 def thresholding_pipeline(img, sobel_kernel=7, mag_thresh=(3, 255), s_thresh=(170, 255)):
@@ -211,8 +254,7 @@ def region_of_interest(img):
     else:
         ignore_mask_color = 255
 
-    vertices = np.array([[(0, imshape[0]), (imshape[1] * .48, imshape[0] * .58), (imshape[1] * .52, imshape[0] * .58),
-                          (imshape[1], imshape[0])]], dtype=np.int32)
+    vertices = np.array([[(0, imshape[0]), (imshape[1] * .48, imshape[0] * .58), (imshape[1] * .52, imshape[0] * .58),(imshape[1], imshape[0])]], dtype=np.int32)
     cv.fillPoly(mask, vertices, ignore_mask_color)
     masked_image = cv.bitwise_and(img, mask)
     return masked_image
@@ -297,10 +339,13 @@ def process_adv(image):
 
 capture = cv.VideoCapture('project_video.mp4')
 
+mtx, dist = undistort_camera()
+
 while capture.isOpened():
     ret, frame = capture.read()
     # if frame is read correctly ret is True
-    frame = process_adv(frame)
+    img = cv.undistort(cv.cvtColor(frame, cv.COLOR_RGB2BGR), mtx, dist, None, mtx)
+    frame = process_adv(img)
     cv.imshow('frame', frame)
     if cv.waitKey(1) & 0xFF == ord('q'):
         break

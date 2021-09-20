@@ -254,7 +254,7 @@ def region_of_interest(img):
     else:
         ignore_mask_color = 255
 
-    vertices = np.array([[(0, imshape[0]), (imshape[1] * .48, imshape[0] * .58), (imshape[1] * .52, imshape[0] * .58),(imshape[1], imshape[0])]], dtype=np.int32)
+    vertices = np.array([[(0, imshape[0]), (imshape[1] * .22, imshape[0] * .58), (imshape[1] * .78, imshape[0] * .58),(imshape[1], imshape[0])]], dtype=np.int32)
     cv.fillPoly(mask, vertices, ignore_mask_color)
     masked_image = cv.bitwise_and(img, mask)
     return masked_image
@@ -310,29 +310,18 @@ def draw_lines(img, img_w, left_fit, right_fit, perspective):
 
 
 def process_adv(image):
-    height = image.shape[0]
-    width = image.shape[1]
-    top_left = [300, 300]
-    top_right = [800, 300]
-    bottom_right = [1200, height]
-    bottom_left = [0, height]
-
-    src_mask = np.array([[(top_left[0], top_left[1]), (top_right[0], top_right[1]),
-                          (bottom_right[0], bottom_right[1]), (bottom_left[0], bottom_left[1])]], np.int32)
-    dst_mask = np.array([[(bottom_left[0], 0), (bottom_right[0], 0),
-                          (bottom_right[0], bottom_right[1]), (bottom_left[0], bottom_left[1])]], np.int32)
-
     dest_mask = _createDestination()
     s_mask = _createSource()
 
     combined_img = thresholding_pipeline(image)
     roi_image = region_of_interest(combined_img)
+    blurred = cv.medianBlur(roi_image,5)
 
-    warped = perspective_transform(combined_img, s_mask, dest_mask)
+
+    warped = perspective_transform(blurred, s_mask, dest_mask)
 
     left_fit, right_fit = sliding_windown(warped)
     result = draw_lines(image, warped, left_fit, right_fit, perspective=[s_mask, dest_mask])
-    # result = project_lanelines(warped, image, left_fit, right_fit, dest_mask, s_mask)
 
     return result
 

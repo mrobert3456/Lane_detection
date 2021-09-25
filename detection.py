@@ -221,13 +221,12 @@ def process(image):
 
 def region_of_interest(img):
     mask = np.zeros_like(img)
-
-    imshape = img.shape
+    imshape = img.shape # image shapes
 
     vertices = np.array([[(0, imshape[0]), (imshape[1] * .22, imshape[0] * .58), (imshape[1] * .78, imshape[0] * .58),
                           (imshape[1], imshape[0])]], dtype=np.int32) # creates an array with the trapezoids verticies
 
-    cv.fillPoly(mask, vertices, 255)
+    cv.fillPoly(mask, vertices, 255) # creates the mask
     masked_image = cv.bitwise_and(img, mask) # crops the original image with the mask
     return masked_image
 
@@ -292,14 +291,14 @@ def process_adv(image):
     dest_mask = _createDestination()
     s_mask = _createSource()
 
-    combined_img = thresholding_pipeline(image)
-    roi_image = region_of_interest(combined_img)
-    blurred = cv.medianBlur(roi_image, 5)
+    combined_img = thresholding_pipeline(image) # sobel ans hls thresholding
+    roi_image = region_of_interest(combined_img) # extracts the roi image
+    blurred = cv.medianBlur(roi_image, 5) # blurres the roi image to be more accurate
 
-    warped = perspective_transform(blurred, s_mask, dest_mask)
+    warped = perspective_transform(blurred, s_mask, dest_mask) # create bird's eye view
 
     left_fit, right_fit = sliding_windown(warped) # returns the right and the left lane lines points
-    result = draw_lines(image, warped, left_fit, right_fit, perspective=[s_mask, dest_mask])
+    result = draw_lines(image, warped, left_fit, right_fit, perspective=[s_mask, dest_mask]) # draws the lanes to the original image
 
     return result
 
@@ -308,6 +307,7 @@ capture = cv.VideoCapture('project_video.mp4')
 
 while capture.isOpened():
     ret, frame = capture.read()
+
     # if frame is read correctly ret is True
     frame = process_adv(frame)
     cv.imshow('frame', frame)

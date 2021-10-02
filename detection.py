@@ -265,6 +265,40 @@ def draw_lines(img, img_w, left_fit, right_fit, perspective):
     left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2]
     right_fitx = right_fit[0] * ploty ** 2 + right_fit[1] * ploty + right_fit[2]
 
+    goodlane, radius, width, centeroff = GetCurv(img, img, ploty, left_fit, right_fit, left_fitx, right_fitx, True)
+
+    global errors
+    goodlane = True
+
+    # for i in History:
+    #  if np.abs(radius-i)>100 or width>4 or width<3:
+    #     goodlane=False
+
+    if len(History) > 0:
+        if History[-1] / radius > 2 or History[-1] / radius < 0.5:
+            goodlane = False
+
+        if width > 4 or width < 3:
+            goodlane = False
+
+        if np.abs(OFFC[-1] - centeroff) > 200:
+            goodlane = False
+
+    if goodlane:
+
+        History.append(radius)
+        RIGHT_FIT.append(right_fitx)
+        LEFT_FIT.append(left_fitx)
+        OFFC.append(centeroff)
+        # errors=0
+
+    elif len(History) > 0:
+        left_fitx = LEFT_FIT[-1]
+        right_fitx = RIGHT_FIT[-1]
+        errors += 1
+
+
+
     # Recast the x and y points into usable format for cv.fillPoly()
     pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
     pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])

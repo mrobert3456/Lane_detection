@@ -186,7 +186,7 @@ def draw_lines(img, img_w, left_fit, right_fit, perspective):
     #     goodlane=False
 
     if len(History) > 0:
-        if History[-1] / radius > 2 or History[-1] / radius < 0.5:
+        if History[-1] / radius > 1.5 or History[-1] / radius < 0.75:
             goodlane = False
 
         if width > 4 or width < 3:
@@ -196,15 +196,21 @@ def draw_lines(img, img_w, left_fit, right_fit, perspective):
             goodlane = False
 
     if goodlane:
+        if errors>48:
+            History.clear()
+            RIGHT_FIT.clear()
+            LEFT_FIT.clear()
+            OFFC.clear()
+            errors=0
 
         History.append(radius)
         RIGHT_FIT.append(right_fitx)
         LEFT_FIT.append(left_fitx)
         OFFC.append(centeroff)
-        # errors=0
+
 
     elif len(History) > 0:
-        left_fitx = LEFT_FIT[-1]
+        left_fitx =LEFT_FIT[-1]
         right_fitx = RIGHT_FIT[-1]
         errors += 1
 
@@ -283,7 +289,7 @@ def GetCurv(result, img, ploty, left_fit, right_fit, left_fitx, right_fitx, good
 
 
     # print to image
-    text = "radius = %s [m]\noffcenter = %s [m]" % (str(right_curverad), str(left_curverad))
+    text = "radius = %s [m]\noffcenter = %s [m]" % (str(radius), str(center_off))
     for i, line in enumerate(text.split('\n')):
         i = 50 + 20 * i
         cv.putText(result, line, (0, i), cv.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255), 1, cv.LINE_AA)

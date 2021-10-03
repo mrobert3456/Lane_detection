@@ -11,35 +11,36 @@ def thresholding_pipeline(img, sobel_kernel=7, mag_thresh=(3, 255), s_thresh=(17
     gray = hls_image[:, :, 1]  # gets the grayscale image
     s_channel = hls_image[:, :, 2]  # gets the saturation of the image
 
-
-    sobel_zero = np.zeros(shape=gray.shape,dtype=bool)  # creates an image with the same shape as grayscale image and fills it with zeros
+    sobel_zero = np.zeros(shape=gray.shape,
+                          dtype=bool)  # creates an image with the same shape as grayscale image and fills it with zeros
     hls_zero = sobel_zero
     combined_binary = hls_zero.astype(np.float32)  # converts the s_binary to float32
 
-
     sobelx = cv.Sobel(gray, cv.CV_64F, 1, 0, ksize=sobel_kernel)  # computes the x partial derivatives
 
+    sobel_abs = np.abs(sobelx ** 2)  # takes the absolute value of sobelx^2
 
-    sobel_abs = np.abs(sobelx **2)  # takes the absolute value of sobelx^2
+    sobel_abs = np.uint8(
+        255 * sobel_abs / np.max(sobel_abs))  # scale it to 8 bit then converts to uint8, it would be noisy without it
 
-    sobel_abs = np.uint8(255 * sobel_abs / np.max(sobel_abs))  # scale it to 8 bit then converts to uint8, it would be noisy without it
+    sobel_zero[(sobel_abs > mag_thresh[0]) & (
+                sobel_abs <= mag_thresh[1])] = 1  # writes 1 where the the values is in the magnitude threshold
 
-
-    sobel_zero[(sobel_abs > mag_thresh[0]) & (sobel_abs <= mag_thresh[1])] = 1  # writes 1 where the the values is in the magnitude threshold
-
-    hls_zero[(s_channel >= s_thresh[0]) & (s_channel <= s_thresh[1])] = 1 #writes 1 where the the values is in the s_channel threshold
+    hls_zero[(s_channel >= s_thresh[0]) & (
+                s_channel <= s_thresh[1])] = 1  # writes 1 where the the values is in the s_channel threshold
 
     # Combines the two thresholds
     combined_binary[(hls_zero == 1) | (sobel_zero == 1)] = 1
 
-    combined_binary = np.uint8(255 * combined_binary / np.max(combined_binary)) # scale it to 8 bit then converts to uint8
+    combined_binary = np.uint8(
+        255 * combined_binary / np.max(combined_binary))  # scale it to 8 bit then converts to uint8
     return combined_binary
 
 
 def perspective_transform(img, src_m, dest_m):
     img_size = (img.shape[1], img.shape[0])
-    src = np.float32(src_m) # source transformation matrix
-    dest = np.float32(dest_m) #destination transformation matrix
+    src = np.float32(src_m)  # source transformation matrix
+    dest = np.float32(dest_m)  # destination transformation matrix
     M = cv.getPerspectiveTransform(src, dest)
     warped_img = cv.warpPerspective(img, M, img_size, flags=cv.INTER_LINEAR)
     return warped_img
@@ -136,10 +137,10 @@ def region_of_interest(img):
     imshape = img.shape
 
     vertices = np.array([[(0, imshape[0]), (imshape[1] * .22, imshape[0] * .58), (imshape[1] * .78, imshape[0] * .58),
-                          (imshape[1], imshape[0])]], dtype=np.int32) # creates an array with the trapezoids verticies
+                          (imshape[1], imshape[0])]], dtype=np.int32)  # creates an array with the trapezoids verticies
 
     cv.fillPoly(mask, vertices, 255)
-    masked_image = cv.bitwise_and(img, mask) # crops the original image with the mask
+    masked_image = cv.bitwise_and(img, mask)  # crops the original image with the mask
     return masked_image
 
 
@@ -166,13 +167,11 @@ def _createDestination():
 
 
 def draw_lines(img, img_w, left_fit, right_fit, perspective):
-
     # Creates an image to draw the lines on
     warp_zero = np.zeros_like(img_w).astype(np.uint8)
     color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
 
-
-    ploty = np.linspace(0, img.shape[0] - 1, img.shape[0]) # makes evenly spaced points of the lane points
+    ploty = np.linspace(0, img.shape[0] - 1, img.shape[0])  # makes evenly spaced points of the lane points
     left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2]
     right_fitx = right_fit[0] * ploty ** 2 + right_fit[1] * ploty + right_fit[2]
 
@@ -186,22 +185,22 @@ def draw_lines(img, img_w, left_fit, right_fit, perspective):
     #     goodlane=False
 
     if len(History) > 0:
-        if History[-1] / radius > 1.5 or History[-1] / radius < 0.75:
+        if History[-1] / radius > 2 or History[-1] / radius < 0.2:
             goodlane = False
 
         if width > 4 or width < 3:
             goodlane = False
 
-        if np.abs(OFFC[-1] - centeroff) > 200:
+        if centeroff < 0 or np.abs(OFFC[-1] - centeroff) > 150:
             goodlane = False
 
     if goodlane:
-        if errors>48:
+        if errors > 48:
             History.clear()
             RIGHT_FIT.clear()
             LEFT_FIT.clear()
             OFFC.clear()
-            errors=0
+            errors = 0
 
         History.append(radius)
         RIGHT_FIT.append(right_fitx)
@@ -210,11 +209,9 @@ def draw_lines(img, img_w, left_fit, right_fit, perspective):
 
 
     elif len(History) > 0:
-        left_fitx =LEFT_FIT[-1]
+        left_fitx = LEFT_FIT[-1]
         right_fitx = RIGHT_FIT[-1]
         errors += 1
-
-
 
     # Recast the x and y points into usable format for cv.fillPoly()
     pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
@@ -263,38 +260,37 @@ def GetCurv(result, img, ploty, left_fit, right_fit, left_fitx, right_fitx, good
         2 * right_fit_cr[0])
     # Now our radius of curvature is in meters
 
-    diff = np.abs(left_curverad-right_curverad)
-    #print(diff)
+    diff = np.abs(left_curverad - right_curverad)
+    # print(diff)
 
     radius = round((float(left_curverad) + float(right_curverad)) / 2., 2)
-    #radius = right_curverad/left_curverad
+    # radius = right_curverad/left_curverad
 
     lane_width = (right_fit[2] - left_fit[2]) * xm_per_pix
-    #lane_width = np.mean((right_fitx-left_fitx)*xm_per_pix)
+    # lane_width = np.mean((right_fitx-left_fitx)*xm_per_pix)
     print(lane_width)
 
     center = (right_fit[2] - left_fit[2]) / 2
 
-    #diff = np.abs(left_curverad-right_curverad)
-    #if diff>100:
-     #   goodlane=False
+    # diff = np.abs(left_curverad-right_curverad)
+    # if diff>100:
+    #   goodlane=False
 
-    #if lane_width>4 or lane_width<3:
-     #   goodlane=False
+    # if lane_width>4 or lane_width<3:
+    #   goodlane=False
 
     left_off = (center - left_fit[2]) * xm_per_pix
     right_off = (right_fit[2] - center) * xm_per_pix
 
     center_off = round(center - img.shape[0] / 2. * xm_per_pix, 2)
 
-
     # print to image
-    text = "radius = %s [m]\noffcenter = %s [m]" % (str(radius), str(center_off))
+    text = "radius = %s [m]\noffcenter = %s [m]\nwidth = %s [m]\nLeft_curve = %s\nRight_curve = %s" % (str(radius), str(center_off), str(lane_width),str(left_curverad), str(right_curverad))
     for i, line in enumerate(text.split('\n')):
         i = 50 + 20 * i
         cv.putText(result, line, (0, i), cv.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255), 1, cv.LINE_AA)
 
-    return goodlane,radius, lane_width, center_off
+    return goodlane, radius, lane_width, center_off
 
 
 def process_adv(image):
@@ -303,7 +299,7 @@ def process_adv(image):
 
     combined_img = thresholding_pipeline(image)
     roi_image = region_of_interest(combined_img)
-    blurred = cv.medianBlur(roi_image,3)
+    blurred = cv.medianBlur(roi_image, 3)
 
     warped = perspective_transform(blurred, s_mask, dest_mask)
 
@@ -322,7 +318,6 @@ RIGHT_FIT = list()
 OFFC = list()
 WidthH = list()
 errors = 0
-
 
 while capture.isOpened():
     ret, frame = capture.read()

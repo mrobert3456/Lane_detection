@@ -46,7 +46,7 @@ def perspective_transform(img, src_m, dest_m):
     return warped_img
 
 
-def sliding_windown(img_w):
+def sliding_windown(img_w, marginsize):
     histogram = np.sum(img_w[int(img_w.shape[0] / 2):, :], axis=0)
 
     # Creates an output image to draw on and visualize the result
@@ -74,7 +74,7 @@ def sliding_windown(img_w):
     rightx_current = rightx_base
 
     # Set the width of the windows +/- margin
-    margin = 100
+    margin = marginsize
     # Set minimum number of pixels found to recenter window
     minpix = 50
 
@@ -166,7 +166,7 @@ def _createDestination():
     return np.float32([destinationBottomLeft, destinationTopLeft, destinationTopRight, destinationBottomRight])
 
 
-def draw_lines(img, img_w, left_fit, right_fit, perspective):
+def draw_lines(img, img_w, left_fit, right_fit, perspective,color):
     # Creates an image to draw the lines on
     warp_zero = np.zeros_like(img_w).astype(np.uint8)
     color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
@@ -175,43 +175,7 @@ def draw_lines(img, img_w, left_fit, right_fit, perspective):
     left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2]
     right_fitx = right_fit[0] * ploty ** 2 + right_fit[1] * ploty + right_fit[2]
 
-    goodlane, radius, width, centeroff = GetCurv(img, img, ploty, left_fit, right_fit, left_fitx, right_fitx, True)
 
-    global errors
-    goodlane = True
-
-    # for i in History:
-    #  if np.abs(radius-i)>100 or width>4 or width<3:
-    #     goodlane=False
-
-    if len(History) > 0:
-        if History[-1] / radius > 2 or History[-1] / radius < 0.2:
-            goodlane = False
-
-        if width > 4 or width < 3:
-            goodlane = False
-
-        if centeroff < 0 or np.abs(OFFC[-1] - centeroff) > 150:
-            goodlane = False
-
-    if goodlane:
-        if errors > 48:
-            History.clear()
-            RIGHT_FIT.clear()
-            LEFT_FIT.clear()
-            OFFC.clear()
-            errors = 0
-
-        History.append(radius)
-        RIGHT_FIT.append(right_fitx)
-        LEFT_FIT.append(left_fitx)
-        OFFC.append(centeroff)
-
-
-    elif len(History) > 0:
-        left_fitx = LEFT_FIT[-1]
-        right_fitx = RIGHT_FIT[-1]
-        errors += 1
 
     # Recast the x and y points into usable format for cv.fillPoly()
     pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
@@ -220,7 +184,7 @@ def draw_lines(img, img_w, left_fit, right_fit, perspective):
 
     # Draw the lane onto the warped blank image
 
-    cv.fillPoly(color_warp, np.int_([pts]), (0, 255, 0))
+    cv.fillPoly(color_warp, np.int_([pts]), color)
 
     # Warp the blank back to original image space using inverse perspective matrix
     newwarp = perspective_transform(color_warp, perspective[1], perspective[0])
@@ -239,7 +203,7 @@ def draw_lines(img, img_w, left_fit, right_fit, perspective):
     return result
 
 
-def GetCurv(result, img, ploty, left_fit, right_fit, left_fitx, right_fitx, goodlane):
+def GetCurv(result, img, ploty, left_fit, right_fit, left_fitx, right_fitx):
     y_eval = np.max(ploty)
 
     left_curverad = ((1 + (2 * left_fit[0] * y_eval + left_fit[1]) ** 2) ** 1.5) / np.absolute(2 * left_fit[0])
@@ -260,15 +224,15 @@ def GetCurv(result, img, ploty, left_fit, right_fit, left_fitx, right_fitx, good
         2 * right_fit_cr[0])
     # Now our radius of curvature is in meters
 
-    diff = np.abs(left_curverad - right_curverad)
+    #diff = np.abs(left_curverad - right_curverad)
     # print(diff)
 
-    radius = round((float(left_curverad) + float(right_curverad)) / 2., 2)
-    # radius = right_curverad/left_curverad
+    #radius = round((float(left_curverad) + float(right_curverad)) / 2., 2)
+    radius = right_curverad/left_curverad
 
-    lane_width = (right_fit[2] - left_fit[2]) * xm_per_pix
-    # lane_width = np.mean((right_fitx-left_fitx)*xm_per_pix)
-    print(lane_width)
+    #lane_width = (right_fit[2] - left_fit[2]) * xm_per_pix
+    lane_width = np.mean((right_fitx-left_fitx)*xm_per_pix)
+  #  print(lane_width)
 
     center = (right_fit[2] - left_fit[2]) / 2
 
@@ -290,8 +254,30 @@ def GetCurv(result, img, ploty, left_fit, right_fit, left_fitx, right_fitx, good
         i = 50 + 20 * i
         cv.putText(result, line, (0, i), cv.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255), 1, cv.LINE_AA)
 
-    return goodlane, radius, lane_width, center_off
+    return  right_curverad,left_curverad, radius, lane_width, center_off
 
+
+def sanity_check(img, left_fit, right_fit):
+
+    ploty = np.linspace(0, img.shape[0] - 1, img.shape[0])  # makes evenly spaced points of the lane points
+    left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2]
+    right_fitx = right_fit[0] * ploty ** 2 + right_fit[1] * ploty + right_fit[2]
+    global  count
+    right_c, left_c, radius, width, centeroff = GetCurv(img, img, ploty, left_fit, right_fit, left_fitx, right_fitx)
+
+    if count<=0 :
+        count+=1
+        return True
+
+    if width > 4 or width <3.4:
+        return False
+
+    if right_c< 1000 and left_c < 1000 and right_c>100 and left_c>100 :
+        if radius >2 or radius < 0.5 :
+            return False
+
+
+    return True
 
 def process_adv(image):
     dest_mask = _createDestination()
@@ -302,9 +288,30 @@ def process_adv(image):
     blurred = cv.medianBlur(roi_image, 3)
 
     warped = perspective_transform(blurred, s_mask, dest_mask)
+    global  errors
+    global GoodLane
 
-    left_fit, right_fit = sliding_windown(warped)  # returns the right and the left lane lines points
-    result = draw_lines(image, warped, left_fit, right_fit, perspective=[s_mask, dest_mask])
+    left_fit =[]
+    right_fit=[]
+
+    if GoodLane:
+        left_fit, right_fit = sliding_windown(warped,marginsize=50)  # returns the right and the left lane lines points
+    else:
+        left_fit, right_fit = sliding_windown(warped, marginsize=100)  # returns the right and the left lane lines points
+
+    result =image
+
+    if sanity_check(image,left_fit,right_fit):
+        result = draw_lines(image, warped, left_fit, right_fit, perspective=[s_mask, dest_mask],color=(0,255,0))
+        GoodLane=True
+
+        LEFT_FIT.append(left_fit)
+        RIGHT_FIT.append(right_fit)
+    else:
+        if len(LEFT_FIT) > 0:
+            result = draw_lines(image, warped, LEFT_FIT[-1], RIGHT_FIT[-1], perspective=[s_mask, dest_mask], color=(0, 0, 255))
+
+        GoodLane=False
 
     return result
 
@@ -318,6 +325,8 @@ RIGHT_FIT = list()
 OFFC = list()
 WidthH = list()
 errors = 0
+GoodLane = True
+count =0
 
 while capture.isOpened():
     ret, frame = capture.read()

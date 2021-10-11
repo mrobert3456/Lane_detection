@@ -136,7 +136,7 @@ def region_of_interest(img):
 
     imshape = img.shape
 
-    vertices = np.array([[(0, imshape[0]), (imshape[1] * .22, imshape[0] * .58), (imshape[1] * .78, imshape[0] * .58),
+    vertices = np.array([[(0, imshape[0]), (imshape[1] * .48, imshape[0] * .58), (imshape[1] * .52, imshape[0] * .58),
                           (imshape[1], imshape[0])]], dtype=np.int32)  # creates an array with the trapezoids verticies
 
     cv.fillPoly(mask, vertices, 255)

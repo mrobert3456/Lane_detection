@@ -258,24 +258,34 @@ def GetCurv(result, img, ploty, left_fit, right_fit, left_fitx, right_fitx):
 
 
 def sanity_check(img, left_fit, right_fit):
-
+    """Decides whether the detectes lane is valid or not"""
     ploty = np.linspace(0, img.shape[0] - 1, img.shape[0])  # makes evenly spaced points of the lane points
     left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2]
     right_fitx = right_fit[0] * ploty ** 2 + right_fit[1] * ploty + right_fit[2]
-    global  count
+
+    global  first_lane
     right_c, left_c, radius, width, centeroff = GetCurv(img, img, ploty, left_fit, right_fit, left_fitx, right_fitx)
 
-    if count<=0 :
-        count+=1
+    if first_lane : # if the first lane is, than returns true
+        first_lane=False
         return True
 
-    if width > 4 or width <3.4:
+    # determines that the latest lane difference from the last one
+    left_diff = np.sum(np.absolute(LEFT_FIT[-1] - left_fit))
+    right_diff = np.sum(np.absolute(RIGHT_FIT[-1] - right_fit))
+
+    lane_pixel_margin = 50  # How much different the new lane's x-values can be from the last lane
+    diff_threshold = lane_pixel_margin * len(LEFT_FIT[-1])
+
+    if left_diff > diff_threshold or right_diff > diff_threshold: # if the current lane is within the threshold limit
         return False
 
-    if right_c< 1000 and left_c < 1000 and right_c>100 and left_c>100 :
-        if radius >2 or radius < 0.5 :
-            return False
+    if width > 4 or width < 3.4:
+        return False
 
+    if right_c < 1000 and left_c < 1000 and right_c > 100 and left_c > 100:
+        if radius > 2 or radius < 0.5:
+            return False
 
     return True
 

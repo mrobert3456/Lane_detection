@@ -289,6 +289,24 @@ def sanity_check(img, left_fit, right_fit):
 
     return True
 
+def get_avg_lane():
+    """Gets the avarage of the detected lanes"""
+    if len(LEFT_FIT)<2: # if the history size is less than 2 ,then returns the latest history
+        return LEFT_FIT[-1], RIGHT_FIT[-1]
+
+    left_avg = LEFT_FIT[-1]
+    right_avg = RIGHT_FIT[-1]
+    n_lanes = len(LEFT_FIT)
+
+    for i in range(1, n_lanes):
+        left_avg = np.add(left_avg, LEFT_FIT[i])
+        right_avg = np.add(right_avg, RIGHT_FIT[i])
+
+    avg_left_fitx = left_avg / n_lanes
+    avg_right_fitx= right_avg / n_lanes
+
+    return avg_left_fitx, avg_right_fitx
+
 def process_adv(image):
     dest_mask = _createDestination()
     s_mask = _createSource()

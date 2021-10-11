@@ -81,7 +81,7 @@ def sliding_windown(img_w, marginsize):
     # Create empty lists to receive left and right lane pixel indices
     left_lane_inds = []
     right_lane_inds = []
-
+    color = (0, 255, 0)
     # Step through the windows one by one
     for window in range(nwindows):
         # Identify window boundaries in x and y (and right and left)
@@ -93,9 +93,11 @@ def sliding_windown(img_w, marginsize):
         win_xright_low = rightx_current - margin
         win_xright_high = rightx_current + margin
 
+
+
         # Draw the windows on the visualization image
-        recone = cv.rectangle(out_img, (win_xleft_low, win_y_low), (win_xleft_high, win_y_high), (0, 255, 0), 2)
-        rectwo = cv.rectangle(out_img, (win_xright_low, win_y_low), (win_xright_high, win_y_high), (0, 255, 0), 2)
+        recone = cv.rectangle(out_img, (win_xleft_low, win_y_low), (win_xleft_high, win_y_high), color, 2)
+        rectwo = cv.rectangle(out_img, (win_xright_low, win_y_low), (win_xright_high, win_y_high), color, 2)
 
         # Identify the nonzero pixels in x and y within the window
         good_left_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) & (nonzerox >= win_xleft_low) & (
@@ -128,7 +130,7 @@ def sliding_windown(img_w, marginsize):
     left_fit = np.polyfit(lefty, leftx, 2)
     right_fit = np.polyfit(righty, rightx, 2)
 
-    return left_fit, right_fit
+    return left_fit, right_fit, out_img
 
 
 def region_of_interest(img):
@@ -232,7 +234,7 @@ def GetCurv(result, img, ploty, left_fit, right_fit, left_fitx, right_fitx):
 
     #lane_width = (right_fit[2] - left_fit[2]) * xm_per_pix
     lane_width = np.mean((right_fitx-left_fitx)*xm_per_pix)
-  #  print(lane_width)
+    #print(lane_width)
 
     center = (right_fit[2] - left_fit[2]) / 2
 
@@ -318,28 +320,44 @@ def process_adv(image):
     warped = perspective_transform(blurred, s_mask, dest_mask)
     global  errors
     global GoodLane
+    global first_lane
 
     left_fit =[]
     right_fit=[]
-
+    outimg=image
     if GoodLane:
-        left_fit, right_fit = sliding_windown(warped,marginsize=50)  # returns the right and the left lane lines points
+        left_fit, right_fit, outimg = sliding_windown(warped,marginsize=50)  # returns the right and the left lane lines points
     else:
-        left_fit, right_fit = sliding_windown(warped, marginsize=100)  # returns the right and the left lane lines points
+        left_fit, right_fit, outimg = sliding_windown(warped, marginsize=100)  # returns the right and the left lane lines points
 
     result =image
 
     if sanity_check(image,left_fit,right_fit):
         result = draw_lines(image, warped, left_fit, right_fit, perspective=[s_mask, dest_mask],color=(0,255,0))
         GoodLane=True
-
         LEFT_FIT.append(left_fit)
         RIGHT_FIT.append(right_fit)
+
     else:
         if len(LEFT_FIT) > 0:
-            result = draw_lines(image, warped, LEFT_FIT[-1], RIGHT_FIT[-1], perspective=[s_mask, dest_mask], color=(0, 0, 255))
+            left_fit_avg,right_fit_avg = get_avg_lane() # gets the avg lane
+
+            if errors > 12: # if the errors reach 12, then reset the history, but saves the latest data from history
+                errors = 0
+                first_lane = True
+                prev_r=RIGHT_FIT[-1]
+                prev_l=LEFT_FIT[-1]
+                LEFT_FIT.clear()
+                RIGHT_FIT.clear()
+
+                LEFT_FIT.append(prev_l)
+                RIGHT_FIT.append(prev_r)
+
+            result = draw_lines(image, warped, left_fit_avg,right_fit_avg, perspective=[s_mask, dest_mask], color=(0, 0, 255))
 
         GoodLane=False
+
+        errors+=1
 
     return result
 
@@ -354,7 +372,7 @@ OFFC = list()
 WidthH = list()
 errors = 0
 GoodLane = True
-count =0
+first_lane=True
 
 while capture.isOpened():
     ret, frame = capture.read()

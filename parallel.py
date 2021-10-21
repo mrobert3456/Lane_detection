@@ -88,3 +88,51 @@ def GrayScaleGPU(img):
 
     cannyimg = cv.Canny(result, 100, 200)  # use canny edge detection on the grayscale img
     return cannyimg
+
+
+def HistogramGPU(img):
+    res = img[0, :]
+    img_uj = img[int(img.shape[0] / 2):, :]
+    height = img.shape[0] / 2
+    width = img.shape[1]
+    dim_gridx = math.ceil(width / BLOCK_SIZE)
+    dim_gridy = math.ceil(height / BLOCK_SIZE)
+
+    dev_Hist = cuda.mem_alloc(res.nbytes)
+    dev_kep = cuda.mem_alloc(img_uj.nbytes)
+
+    cuda.memcpy_htod(dev_Hist, res)
+    cuda.memcpy_htod(dev_kep, img_uj)
+
+    mod = SourceModule("""
+                __global__ void HistogramGPU(unsigned char * img, unsigned char* Hist,unsigned int row, unsigned int col)
+                {
+                    const unsigned int sor = threadIdx.y + blockIdx.y * blockDim.y;
+                    const unsigned int oszlop = threadIdx.x + blockIdx.x * blockDim.x;
+
+                    if (oszlop<col)
+                    {
+                        float sum=0;
+                        for (int i=0; i<row; i++)
+                        {
+                            const unsigned int idx = oszlop+i*col;
+                            sum +=img[idx];
+                        }
+                        Hist[oszlop]=sum;
+                    }
+                    else
+                    {
+                        return;
+                    }
+
+                }
+        """)
+
+    block_count = int((width - 1) / (BLOCK_SIZE * BLOCK_SIZE) + 1)
+    GetHist = mod.get_function("HistogramGPU")
+    GetHist(dev_kep, dev_Hist, numpy.uint32(height), numpy.uint32(width), block=(1024, 1, 1), grid=(block_count, 1))
+
+    Histogram = numpy.zeros_like(res)
+    cuda.memcpy_dtoh(Histogram, dev_Hist)
+
+    return Histogram

@@ -1,5 +1,8 @@
 import pycuda.driver as cuda
+import pycuda.autoinit
 from pycuda.compiler import SourceModule
+import pycuda.gpuarray as gpuarray
+from pycuda import driver
 import numpy
 import os
 
@@ -9,8 +12,7 @@ import math
 BLOCK_SIZE = 32
 
 if (os.system("cl.exe")):
-    os.environ[
-        'PATH'] += ';' + r"C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Tools\MSVC\14.28.29910\bin\Hostx64\x64"
+    os.environ['PATH'] += ';' + r"C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Tools\MSVC\14.28.29910\bin\Hostx64\x64"
 
 
 def GrayScaleGPU(img):

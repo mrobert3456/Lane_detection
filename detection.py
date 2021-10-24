@@ -4,7 +4,8 @@ import matplotlib.pylab as plt
 import glob
 import pickle
 import os
-
+import parallel
+from timeit import default_timer as timer
 
 def thresholding_pipeline(img, sobel_kernel=7, mag_thresh=(3, 255), s_thresh=(170, 255)):
     hls_image = cv.cvtColor(img, cv.COLOR_RGB2HLS)  # converts the input image into hls colour space
@@ -47,7 +48,9 @@ def perspective_transform(img, src_m, dest_m):
 
 
 def sliding_windown(img_w, marginsize):
-    histogram = np.sum(img_w[int(img_w.shape[0] / 2):, :], axis=0)
+    #histogram = np.sum(img_w[int(img_w.shape[0] / 2):, :], axis=0)
+    histogram = parallel.HistogramGPU(img_w)
+
 
     # Creates an output image to draw on and visualize the result
     out_img = np.dstack((img_w, img_w, img_w)) * 255
@@ -313,7 +316,8 @@ def process_adv(image):
     dest_mask = _createDestination()
     s_mask = _createSource()
 
-    combined_img = thresholding_pipeline(image)
+    combined_img = parallel.GrayScaleGPU(image)
+    #combined_img = thresholding_pipeline(image)
     roi_image = region_of_interest(combined_img)
     blurred = cv.medianBlur(roi_image, 3)
 
@@ -329,8 +333,8 @@ def process_adv(image):
         left_fit, right_fit, outimg = sliding_windown(warped,marginsize=50)  # returns the right and the left lane lines points
     else:
         left_fit, right_fit, outimg = sliding_windown(warped, marginsize=100)  # returns the right and the left lane lines points
-
-    result =image
+    #return outimg
+    #result =image
 
     if sanity_check(image,left_fit,right_fit):
         result = draw_lines(image, warped, left_fit, right_fit, perspective=[s_mask, dest_mask],color=(0,255,0))
@@ -362,7 +366,7 @@ def process_adv(image):
     return result
 
 
-capture = cv.VideoCapture('challenge_video.mp4')
+capture = cv.VideoCapture('project_video.mp4')
 
 History = list()
 
@@ -374,11 +378,35 @@ errors = 0
 GoodLane = True
 first_lane=True
 
+# FPS counter
+counter = 0
+
+fps_start = timer()
+
 while capture.isOpened():
     ret, frame = capture.read()
     # if frame is read correctly ret is True
     frame = process_adv(frame)
     cv.imshow('frame', frame)
+
+
+    counter += 1
+
+    # Stopping timer for FPS
+    # Getting current time point in seconds
+    fps_stop = timer()
+
+    # Checking if timer reached 1 second
+    # Comparing
+    if fps_stop - fps_start >= 1.0:
+        # Showing FPS rate
+        print('FPS rate is: ', counter)
+        # Reset FPS counter
+        counter = 0
+        # Restart timer for FPS
+        # Getting current time point in seconds
+        fps_start = timer()
+
     if cv.waitKey(1) & 0xFF == ord('q'):
         break
 

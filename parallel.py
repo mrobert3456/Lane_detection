@@ -100,6 +100,9 @@ def HistogramGPU(img):
     dim_gridx = math.ceil(width / BLOCK_SIZE)
     dim_gridy = math.ceil(height / BLOCK_SIZE)
 
+
+
+
     dev_Hist = cuda.mem_alloc(res.nbytes)
     dev_kep = cuda.mem_alloc(img_uj.nbytes)
 
@@ -107,20 +110,36 @@ def HistogramGPU(img):
     cuda.memcpy_htod(dev_kep, img_uj)
 
     mod = SourceModule("""
-                __global__ void HistogramGPU(unsigned char * img, unsigned char* Hist,unsigned int row, unsigned int col)
+                __global__ void HistogramGPU(unsigned char * img,  unsigned char * Hist,const unsigned int height, const unsigned int width)
                 {
-                    const unsigned int sor = threadIdx.y + blockIdx.y * blockDim.y;
+                    //const unsigned int sor = threadIdx.y + blockIdx.y * blockDim.y;
                     const unsigned int oszlop = threadIdx.x + blockIdx.x * blockDim.x;
-
-                    if (oszlop<col)
+                    
+                    //__shared__ float shared_kep[360][1280];
+                    
+                    //if (oszlop ==0)
+                    //{
+                        //for(int i=0;i<height;i++)
+                        //{
+                         //   unsigned int idx = oszlop+i*width;
+                         //   shared_kep[i][oszlop]= img[idx];
+                       // }
+                    //}
+                    //__syncthreads();
+                    
+        
+                    if (oszlop<width)
                     {
-                        float sum=0;
-                        for (int i=0; i<row; i++)
+                        int sum=0;
+                        for (int i=0; i<height; i++)
                         {
-                            const unsigned int idx = oszlop+i*col;
-                            sum +=img[idx];
+                            unsigned int idx = oszlop+i*width;
+                          //  sum+=shared_kep[i][oszlop];
+                          sum+=img[idx];
                         }
-                        Hist[oszlop]=sum;
+                         //*(Hist+oszlop)=sum;
+                         Hist[oszlop] =sum/width;
+                           
                     }
                     else
                     {
@@ -132,7 +151,7 @@ def HistogramGPU(img):
 
     block_count = int((width - 1) / (BLOCK_SIZE * BLOCK_SIZE) + 1)
     GetHist = mod.get_function("HistogramGPU")
-    GetHist(dev_kep, dev_Hist, numpy.uint32(height), numpy.uint32(width), block=(1024, 1, 1), grid=(block_count, 1))
+    GetHist(dev_kep, dev_Hist, numpy.uint32(height), numpy.uint32(width), block=(1024, 1, 1),grid=(block_count,1))
 
     Histogram = numpy.zeros_like(res)
     cuda.memcpy_dtoh(Histogram, dev_Hist)

@@ -8,7 +8,7 @@ import parallel
 from timeit import default_timer as timer
 
 def thresholding_pipeline(img, sobel_kernel=7, mag_thresh=(3, 255), s_thresh=(170, 255)):
-    hls_image = cv.cvtColor(img, cv.COLOR_RGB2HLS)  # converts the input image into hls colour space
+    hls_image = cv.cvtColor(img, cv.COLOR_RGB2HSV)  # converts the input image into hls colour space
     gray = hls_image[:, :, 1]  # gets the grayscale image
     s_channel = hls_image[:, :, 2]  # gets the saturation of the image
 
@@ -61,6 +61,7 @@ def sliding_windown(img_w, marginsize):
     leftx_base = np.argmax(histogram[:midpoint])
     rightx_base = np.argmax(histogram[midpoint:]) + midpoint
 
+
     # Choose the number of sliding windows
     nwindows = 9
 
@@ -78,6 +79,7 @@ def sliding_windown(img_w, marginsize):
 
     # Set the width of the windows +/- margin
     margin = marginsize
+
     # Set minimum number of pixels found to recenter window
     minpix = 50
 
@@ -96,6 +98,10 @@ def sliding_windown(img_w, marginsize):
         win_xright_low = rightx_current - margin
         win_xright_high = rightx_current + margin
 
+        if win_xleft_low >= win_xright_low and win_xleft_high >= win_xright_high:
+            win_xleft_low -= 60
+            win_xleft_high -= 60
+            color = (255, 0, 0)
 
 
         # Draw the windows on the visualization image
@@ -114,10 +120,26 @@ def sliding_windown(img_w, marginsize):
         right_lane_inds.append(good_right_inds)
 
         # If you found > minpix pixels, recenter next window on their mean position
+        right=False
+        left=False
         if len(good_left_inds) > minpix:
             leftx_current = int(np.mean(nonzerox[good_left_inds]))
+            left=True
+
         if len(good_right_inds) > minpix:
             rightx_current = int(np.mean(nonzerox[good_right_inds]))
+            right=True
+
+        if right and not left:
+            width  =np.abs(rightx_base-leftx_base)
+            leftx_current  = rightx_current
+            leftx_current-=width
+
+        if left and not right:
+            width = np.abs(rightx_base - leftx_base)
+            rightx_current = leftx_current
+            rightx_current += width
+
 
     # Concatenate the arrays of indices
     left_lane_inds = np.concatenate(left_lane_inds)
@@ -130,7 +152,7 @@ def sliding_windown(img_w, marginsize):
     righty = nonzeroy[right_lane_inds]
 
     # Fit a second order polynomial to each
-    left_fit = np.polyfit(lefty, leftx, 2)
+    left_fit = np.polyfit(lefty, leftx,2)
     right_fit = np.polyfit(righty, rightx, 2)
 
     return left_fit, right_fit, out_img
@@ -138,15 +160,29 @@ def sliding_windown(img_w, marginsize):
 
 def region_of_interest(img):
     mask = np.zeros_like(img)
-
+    mask2 =np.zeros_like(img)
     imshape = img.shape
 
     vertices = np.array([[(0, imshape[0]), (imshape[1] * .48, imshape[0] * .58), (imshape[1] * .52, imshape[0] * .58),
-                          (imshape[1], imshape[0])]], dtype=np.int32)  # creates an array with the trapezoids verticies
+                       (imshape[1], imshape[0])]], dtype=np.int32)  # creates an array with the trapezoids verticies
 
     cv.fillPoly(mask, vertices, 255)
     masked_image = cv.bitwise_and(img, mask)  # crops the original image with the mask
-    return masked_image
+
+
+
+    vert2 = np.array([[(300, imshape[0]), (imshape[1] * .52, imshape[0] * .58),
+                          (imshape[1] * .7, imshape[0])]], dtype=np.int32)
+
+
+    vert3 = np.array([[(300, imshape[0]), (imshape[1] * .48, imshape[0] * .77), (imshape[1] * .52, imshape[0] * .77),
+                          (imshape[1] * .7, imshape[0])]], dtype=np.int32)
+
+    cv.fillPoly(mask2, vert3, 255)
+    mask2 = cv.bitwise_not(mask2)
+
+    masked_image_v = cv.bitwise_and(masked_image, mask2)
+    return masked_image_v
 
 
 def _createSource():
@@ -267,7 +303,6 @@ def sanity_check(img, left_fit, right_fit):
     ploty = np.linspace(0, img.shape[0] - 1, img.shape[0])  # makes evenly spaced points of the lane points
     left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2]
     right_fitx = right_fit[0] * ploty ** 2 + right_fit[1] * ploty + right_fit[2]
-
     global  first_lane
     right_c, left_c, radius, width, centeroff = GetCurv(img, img, ploty, left_fit, right_fit, left_fitx, right_fitx)
 
@@ -279,7 +314,7 @@ def sanity_check(img, left_fit, right_fit):
     left_diff = np.sum(np.absolute(LEFT_FIT[-1] - left_fit))
     right_diff = np.sum(np.absolute(RIGHT_FIT[-1] - right_fit))
 
-    lane_pixel_margin = 50  # How much different the new lane's x-values can be from the last lane
+    lane_pixel_margin = 20  # How much different the new lane's x-values can be from the last lane
     diff_threshold = lane_pixel_margin * len(LEFT_FIT[-1])
 
     if left_diff > diff_threshold or right_diff > diff_threshold: # if the current lane is within the threshold limit
@@ -316,12 +351,15 @@ def process_adv(image):
     dest_mask = _createDestination()
     s_mask = _createSource()
 
-    combined_img = parallel.GrayScaleGPU(image)
-    #combined_img = thresholding_pipeline(image)
+    #combined_img = parallel.GrayScaleGPU(image)
+    combined_img = thresholding_pipeline(image)
     roi_image = region_of_interest(combined_img)
-    blurred = cv.medianBlur(roi_image, 3)
+    #blurred = cv.medianBlur(roi_image, 5)
 
-    warped = perspective_transform(blurred, s_mask, dest_mask)
+    #return roi_image
+
+    warped = perspective_transform(roi_image, s_mask, dest_mask)
+    #return warped
     global  errors
     global GoodLane
     global first_lane
@@ -366,7 +404,7 @@ def process_adv(image):
     return result
 
 
-capture = cv.VideoCapture('project_video.mp4')
+capture = cv.VideoCapture('challenge_video.mp4')
 
 History = list()
 

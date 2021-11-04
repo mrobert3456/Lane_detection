@@ -7,10 +7,15 @@ import os
 import parallel
 from timeit import default_timer as timer
 
-def thresholding_pipeline(img, sobel_kernel=7, mag_thresh=(3, 255), s_thresh=(170, 255)):
-    hls_image = cv.cvtColor(img, cv.COLOR_RGB2HSV)  # converts the input image into hls colour space
-    gray = hls_image[:, :, 1]  # gets the grayscale image
-    s_channel = hls_image[:, :, 2]  # gets the saturation of the image
+def thresholding_pipeline(img, sobel_kernel=7, mag_thresh=(3, 255), s_thresh=(170, 255), mod = "HSV"):
+    hsv_image = img
+    if mod =="HSV":
+        hsv_image = cv.cvtColor(img, cv.COLOR_RGB2HSV)  # converts the input image into hls colour space
+    elif mod =="HLS":
+        hsv_image = cv.cvtColor(img, cv.COLOR_RGB2HLS)  # converts the input image into hls colour space
+
+    gray = hsv_image[:, :, 1]  # gets the grayscale image
+    s_channel = hsv_image[:, :, 2]  # gets the saturation of the image
 
     sobel_zero = np.zeros(shape=gray.shape,
                           dtype=bool)  # creates an image with the same shape as grayscale image and fills it with zeros
@@ -35,6 +40,7 @@ def thresholding_pipeline(img, sobel_kernel=7, mag_thresh=(3, 255), s_thresh=(17
 
     combined_binary = np.uint8(
         255 * combined_binary / np.max(combined_binary))  # scale it to 8 bit then converts to uint8
+
     return combined_binary
 
 
@@ -50,7 +56,6 @@ def perspective_transform(img, src_m, dest_m):
 def sliding_windown(img_w, marginsize):
     #histogram = np.sum(img_w[int(img_w.shape[0] / 2):, :], axis=0)
     histogram = parallel.HistogramGPU(img_w)
-
 
     # Creates an output image to draw on and visualize the result
     out_img = np.dstack((img_w, img_w, img_w)) * 255
@@ -120,25 +125,13 @@ def sliding_windown(img_w, marginsize):
         right_lane_inds.append(good_right_inds)
 
         # If you found > minpix pixels, recenter next window on their mean position
-        right=False
-        left=False
         if len(good_left_inds) > minpix:
             leftx_current = int(np.mean(nonzerox[good_left_inds]))
-            left=True
+
 
         if len(good_right_inds) > minpix:
             rightx_current = int(np.mean(nonzerox[good_right_inds]))
-            right=True
 
-        if right and not left:
-            width  =np.abs(rightx_base-leftx_base)
-            leftx_current  = rightx_current
-            leftx_current-=width
-
-        if left and not right:
-            width = np.abs(rightx_base - leftx_base)
-            rightx_current = leftx_current
-            rightx_current += width
 
 
     # Concatenate the arrays of indices
@@ -156,7 +149,6 @@ def sliding_windown(img_w, marginsize):
     right_fit = np.polyfit(righty, rightx, 2)
 
     return left_fit, right_fit, out_img
-
 
 def region_of_interest(img):
     mask = np.zeros_like(img)
@@ -212,15 +204,36 @@ def draw_lines(img, img_w, left_fit, right_fit, perspective,color):
     warp_zero = np.zeros_like(img_w).astype(np.uint8)
     color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
 
+    diff2_l = np.gradient(np.gradient(left_fit)) # gets the second derevative to determine inflection point
+    diff2_r = np.gradient(np.gradient(right_fit)) #gets the second derevative to determine inflection point
+
     ploty = np.linspace(0, img.shape[0] - 1, img.shape[0])  # makes evenly spaced points of the lane points
+
+    helper =[]
+
+    # determines which lane lines inflection point is bigger to determine best inflection point
+    # and then cuts off the faulty part from ploty
+    if np.average(diff2_l)>np.average(diff2_r) and np.average(diff2_r)<img.shape[0]-140 and np.average(diff2_l)<img.shape[0]-140:
+        helper = ploty[int(np.average(diff2_l)):]
+        #print("bal: "+str(np.average(diff2_l)))
+    elif np.average(diff2_r)<img.shape[0]-140 and np.average(diff2_l)<img.shape[0]-140:
+        helper = ploty[int(np.average(diff2_r)):]
+        print("jobb: " + str(np.average(diff2_r)))
+
+    if len(helper)>0:
+        ploty=helper
+    else:
+        ploty=ploty[200:]
+
     left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2]
     right_fitx = right_fit[0] * ploty ** 2 + right_fit[1] * ploty + right_fit[2]
-
 
 
     # Recast the x and y points into usable format for cv.fillPoly()
     pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
     pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
+
+
     pts = np.hstack((pts_left, pts_right))
 
     # Draw the lane onto the warped blank image
@@ -304,6 +317,7 @@ def sanity_check(img, left_fit, right_fit):
     left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2]
     right_fitx = right_fit[0] * ploty ** 2 + right_fit[1] * ploty + right_fit[2]
     global  first_lane
+
     right_c, left_c, radius, width, centeroff = GetCurv(img, img, ploty, left_fit, right_fit, left_fitx, right_fitx)
 
     if first_lane : # if the first lane is, than returns true
@@ -314,13 +328,13 @@ def sanity_check(img, left_fit, right_fit):
     left_diff = np.sum(np.absolute(LEFT_FIT[-1] - left_fit))
     right_diff = np.sum(np.absolute(RIGHT_FIT[-1] - right_fit))
 
-    lane_pixel_margin = 20  # How much different the new lane's x-values can be from the last lane
+    lane_pixel_margin = 50  # How much different the new lane's x-values can be from the last lane
     diff_threshold = lane_pixel_margin * len(LEFT_FIT[-1])
 
     if left_diff > diff_threshold or right_diff > diff_threshold: # if the current lane is within the threshold limit
         return False
 
-    if width > 4 or width < 3.4:
+    if width > 4.0 or width < 3.0:
         return False
 
     if right_c < 1000 and left_c < 1000 and right_c > 100 and left_c > 100:
@@ -353,6 +367,7 @@ def process_adv(image):
 
     #combined_img = parallel.GrayScaleGPU(image)
     combined_img = thresholding_pipeline(image)
+
     roi_image = region_of_interest(combined_img)
     #blurred = cv.medianBlur(roi_image, 5)
 
@@ -366,11 +381,12 @@ def process_adv(image):
 
     left_fit =[]
     right_fit=[]
+    falsidx=720
     outimg=image
     if GoodLane:
         left_fit, right_fit, outimg = sliding_windown(warped,marginsize=50)  # returns the right and the left lane lines points
     else:
-        left_fit, right_fit, outimg = sliding_windown(warped, marginsize=100)  # returns the right and the left lane lines points
+        left_fit, right_fit, outimg= sliding_windown(warped, marginsize=100)  # returns the right and the left lane lines points
     #return outimg
     #result =image
 

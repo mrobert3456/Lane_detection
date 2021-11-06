@@ -204,31 +204,58 @@ def draw_lines(img, img_w, left_fit, right_fit, perspective,color):
     warp_zero = np.zeros_like(img_w).astype(np.uint8)
     color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
 
-    diff2_l = np.gradient(np.gradient(left_fit)) # gets the second derevative to determine inflection point
-    diff2_r = np.gradient(np.gradient(right_fit)) #gets the second derevative to determine inflection point
+
+    diff2_l = np.gradient(np.gradient(left_fit,1),1) # gets the second derevative to determine inflection point
+    diff2_r = np.gradient(np.gradient(right_fit,1),1) #gets the second derevative to determine inflection point
 
     ploty = np.linspace(0, img.shape[0] - 1, img.shape[0])  # makes evenly spaced points of the lane points
 
-    helper =[]
-
-    # determines which lane lines inflection point is bigger to determine best inflection point
-    # and then cuts off the faulty part from ploty
-    if np.average(diff2_l)>np.average(diff2_r) and np.average(diff2_r)<img.shape[0]-140 and np.average(diff2_l)<img.shape[0]-140:
-        helper = ploty[int(np.average(diff2_l)):]
-        #print("bal: "+str(np.average(diff2_l)))
-    elif np.average(diff2_r)<img.shape[0]-140 and np.average(diff2_l)<img.shape[0]-140:
-        helper = ploty[int(np.average(diff2_r)):]
-        print("jobb: " + str(np.average(diff2_r)))
-
-    if len(helper)>0:
-        ploty=helper
-    else:
-        ploty=ploty[200:]
-
+    #ploty = np.linspace(0, img.shape[0] - 1, img.shape[0])  # makes evenly spaced points of the lane points
     left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2]
     right_fitx = right_fit[0] * ploty ** 2 + right_fit[1] * ploty + right_fit[2]
 
+    diff_left = np.gradient(left_fitx,1)
+    sdiff_left=np.gradient(np.gradient(diff_left,1),1)
 
+    diff_right = np.gradient(right_fitx, 1)
+    sdiff_right = np.gradient(np.gradient(diff_right, 1), 1)
+
+    infl_left=-1
+    infl_right=-1
+
+    midpoint = int(ploty.shape[0]/2)
+    positive = diff_left[0]>0 and diff_right[0]>0
+
+
+    for i in range(0,720):
+        if diff_left[i] < 0:
+            infl_left = i
+        if diff_right[i] < 0:
+            infl_right = i
+        if infl_left > -1 and infl_right > -1:
+            break
+
+    if (infl_left > 0 and infl_right > 0) and (infl_left < 100 and infl_right < 100):
+        for i in range(0, 720):
+            if diff_left[i] > 0:
+                infl_left = i
+            if diff_right[i] > 0:
+                infl_right = i
+            if infl_left > -1 and infl_right > -1:
+                break
+
+    if infl_left>-1 and infl_right>-1:
+        if infl_right >= infl_left:
+            ploty = ploty[infl_left:]
+            left_fitx = left_fitx[infl_left:]
+            right_fitx = right_fitx[infl_left:]
+        elif infl_left > infl_right:
+            ploty = ploty[infl_right:]
+            left_fitx = left_fitx[infl_right:]
+            right_fitx = right_fitx[infl_right:]
+
+    print(infl_left)
+    print(infl_right)
     # Recast the x and y points into usable format for cv.fillPoly()
     pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
     pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
@@ -367,6 +394,8 @@ def process_adv(image):
 
     #combined_img = parallel.GrayScaleGPU(image)
     combined_img = thresholding_pipeline(image)
+    #combined_img = cv.cvtColor(image,cv.COLOR_RGB2GRAY)
+    #cannyimg = cv.Canny(combined_img, 100, 200)
 
     roi_image = region_of_interest(combined_img)
     #blurred = cv.medianBlur(roi_image, 5)

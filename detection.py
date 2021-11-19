@@ -4,6 +4,7 @@ import parallel
 from timeit import default_timer as timer
 
 def thresholding_pipeline(img, sobel_kernel=7, mag_thresh=(3, 255), s_thresh=(170, 255), mod = "HSV"):
+    """Combines the HSV and Sobel thresholding"""
     hsv_image = img
     if mod =="HSV":
         hsv_image = cv.cvtColor(img, cv.COLOR_RGB2HSV)  # converts the input image into hsv colour space
@@ -383,6 +384,8 @@ def get_avg_lane():
     return avg_left_fitx, avg_right_fitx
 
 def process_adv(image):
+    """Methodology for detecting lanes"""
+    """Threshold the image - >Gets the ROI -> Perspective transform -> sliding window search -> draw lane- > return final image"""
     dest_mask = _createDestination()
     s_mask = _createSource()
 
@@ -412,7 +415,7 @@ def process_adv(image):
         left_fit, right_fit, outimg= sliding_windown(warped, marginsize=100)  # returns the right and the left lane lines points
     #return outimg
     #result =image
-
+    # validate lane : if the lane is not valid then, itt will be red,and it will use the history
     if sanity_check(image,left_fit,right_fit):
         result = draw_lines(image, warped, left_fit, right_fit, perspective=[s_mask, dest_mask],color=(0,255,0))
         GoodLane=True

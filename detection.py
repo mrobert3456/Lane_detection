@@ -1,16 +1,12 @@
 import numpy as np
 import cv2 as cv
-import matplotlib.pylab as plt
-import glob
-import pickle
-import os
 import parallel
 from timeit import default_timer as timer
 
 def thresholding_pipeline(img, sobel_kernel=7, mag_thresh=(3, 255), s_thresh=(170, 255), mod = "HSV"):
     hsv_image = img
     if mod =="HSV":
-        hsv_image = cv.cvtColor(img, cv.COLOR_RGB2HSV)  # converts the input image into hls colour space
+        hsv_image = cv.cvtColor(img, cv.COLOR_RGB2HSV)  # converts the input image into hsv colour space
     elif mod =="HLS":
         hsv_image = cv.cvtColor(img, cv.COLOR_RGB2HLS)  # converts the input image into hls colour space
 
@@ -45,17 +41,20 @@ def thresholding_pipeline(img, sobel_kernel=7, mag_thresh=(3, 255), s_thresh=(17
 
 
 def perspective_transform(img, src_m, dest_m):
+    """Gets the bird eye view of the image"""
+    """From a bird eye view, the lane lines can be seen as parallel, as it is, but from the original view it seems as the lines are coming together in distance"""
     img_size = (img.shape[1], img.shape[0])
     src = np.float32(src_m)  # source transformation matrix
     dest = np.float32(dest_m)  # destination transformation matrix
-    M = cv.getPerspectiveTransform(src, dest)
-    warped_img = cv.warpPerspective(img, M, img_size, flags=cv.INTER_LINEAR)
+    M = cv.getPerspectiveTransform(src, dest) # gets the perpective transformation matrix
+    warped_img = cv.warpPerspective(img, M, img_size, flags=cv.INTER_LINEAR) # warps the image
     return warped_img
 
 
 def sliding_windown(img_w, marginsize):
+    """Returns the left and the right lane line points"""
     #histogram = np.sum(img_w[int(img_w.shape[0] / 2):, :], axis=0)
-    histogram = parallel.HistogramGPU(img_w)
+    histogram = parallel.HistogramGPU(img_w) # gets the histogram of the image
 
     # Creates an output image to draw on and visualize the result
     out_img = np.dstack((img_w, img_w, img_w)) * 255
@@ -91,7 +90,7 @@ def sliding_windown(img_w, marginsize):
     # Create empty lists to receive left and right lane pixel indices
     left_lane_inds = []
     right_lane_inds = []
-    color = (0, 255, 0)
+    color = (0, 255, 0)#green
     # Step through the windows one by one
     for window in range(nwindows):
         # Identify window boundaries in x and y (and right and left)
@@ -103,10 +102,11 @@ def sliding_windown(img_w, marginsize):
         win_xright_low = rightx_current - margin
         win_xright_high = rightx_current + margin
 
+        # indentify whether the left and the right windows are intersected
         if win_xleft_low >= win_xright_low and win_xleft_high >= win_xright_high:
             win_xleft_low -= 60
             win_xleft_high -= 60
-            color = (255, 0, 0)
+            color = (255, 0, 0) # Red
 
 
         # Draw the windows on the visualization image
@@ -151,11 +151,12 @@ def sliding_windown(img_w, marginsize):
     return left_fit, right_fit, out_img
 
 def region_of_interest(img):
+    """Gets the ROI from the image"""
     mask = np.zeros_like(img)
     mask2 =np.zeros_like(img)
     imshape = img.shape
 
-    vertices = np.array([[(0, imshape[0]), (imshape[1] * .48, imshape[0] * .58), (imshape[1] * .52, imshape[0] * .58),
+    vertices = np.array([[(0, imshape[0]), (imshape[1] * .28, imshape[0] * .58), (imshape[1] * .62, imshape[0] * .58),
                        (imshape[1], imshape[0])]], dtype=np.int32)  # creates an array with the trapezoids verticies
 
     cv.fillPoly(mask, vertices, 255)
@@ -163,8 +164,8 @@ def region_of_interest(img):
 
 
 
-    vert2 = np.array([[(300, imshape[0]), (imshape[1] * .52, imshape[0] * .58),
-                          (imshape[1] * .7, imshape[0])]], dtype=np.int32)
+    #vert2 = np.array([[(300, imshape[0]), (imshape[1] * .52, imshape[0] * .58),
+     #                     (imshape[1] * .7, imshape[0])]], dtype=np.int32)
 
 
     vert3 = np.array([[(300, imshape[0]), (imshape[1] * .48, imshape[0] * .77), (imshape[1] * .52, imshape[0] * .77),
@@ -178,8 +179,9 @@ def region_of_interest(img):
 
 
 def _createSource():
+    """Returns a matrix with the quadrangle indicies from the original image """
     _imageSize = (1280, 720)
-    xOffsetBottom = 200
+    xOffsetBottom =200
     xOffsetMiddle = 595
     yOffset = 450
     sourceBottomLeft = (xOffsetBottom, _imageSize[1])
@@ -190,6 +192,7 @@ def _createSource():
 
 
 def _createDestination():
+    """Returns a matrix with the quadrangle indicies in the destination image """
     _imageSize = (1280, 720)
     xOffset = _imageSize[0] / 4
     destinationBottomLeft = (xOffset, _imageSize[1])
@@ -200,10 +203,14 @@ def _createDestination():
 
 
 def draw_lines(img, img_w, left_fit, right_fit, perspective,color):
+    """ Draws the lane to the original image"""
+
     # Creates an image to draw the lines on
     warp_zero = np.zeros_like(img_w).astype(np.uint8)
     color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
 
+
+    # Find the inflection point of the lane, so the polynom can be corrected
 
     diff2_l = np.gradient(np.gradient(left_fit,1),1) # gets the second derevative to determine inflection point
     diff2_r = np.gradient(np.gradient(right_fit,1),1) #gets the second derevative to determine inflection point
@@ -211,8 +218,8 @@ def draw_lines(img, img_w, left_fit, right_fit, perspective,color):
     ploty = np.linspace(0, img.shape[0] - 1, img.shape[0])  # makes evenly spaced points of the lane points
 
     #ploty = np.linspace(0, img.shape[0] - 1, img.shape[0])  # makes evenly spaced points of the lane points
-    left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2]
-    right_fitx = right_fit[0] * ploty ** 2 + right_fit[1] * ploty + right_fit[2]
+    left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2] # left polynom
+    right_fitx = right_fit[0] * ploty ** 2 + right_fit[1] * ploty + right_fit[2] # right polynom
 
     diff_left = np.gradient(left_fitx,1)
     sdiff_left=np.gradient(np.gradient(diff_left,1),1)
@@ -223,7 +230,6 @@ def draw_lines(img, img_w, left_fit, right_fit, perspective,color):
     infl_left=-1
     infl_right=-1
 
-    midpoint = int(ploty.shape[0]/2)
     positive = diff_left[0]>0 and diff_right[0]>0
 
 
@@ -235,14 +241,7 @@ def draw_lines(img, img_w, left_fit, right_fit, perspective,color):
         if infl_left > -1 and infl_right > -1:
             break
 
-    if (infl_left > 0 and infl_right > 0) and (infl_left < 100 and infl_right < 100):
-        for i in range(0, 720):
-            if diff_left[i] > 0:
-                infl_left = i
-            if diff_right[i] > 0:
-                infl_right = i
-            if infl_left > -1 and infl_right > -1:
-                break
+
 
     if infl_left>-1 and infl_right>-1:
         if infl_right >= infl_left:
@@ -254,8 +253,6 @@ def draw_lines(img, img_w, left_fit, right_fit, perspective,color):
             left_fitx = left_fitx[infl_right:]
             right_fitx = right_fitx[infl_right:]
 
-    print(infl_left)
-    print(infl_right)
     # Recast the x and y points into usable format for cv.fillPoly()
     pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
     pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
@@ -264,7 +261,6 @@ def draw_lines(img, img_w, left_fit, right_fit, perspective,color):
     pts = np.hstack((pts_left, pts_right))
 
     # Draw the lane onto the warped blank image
-
     cv.fillPoly(color_warp, np.int_([pts]), color)
 
     # Warp the blank back to original image space using inverse perspective matrix
@@ -285,7 +281,8 @@ def draw_lines(img, img_w, left_fit, right_fit, perspective,color):
 
 
 def GetCurv(result, img, ploty, left_fit, right_fit, left_fitx, right_fitx):
-    y_eval = np.max(ploty)
+    """Gets the curvature , radius, lane width, and center offset"""
+    y_eval = np.max(ploty) # Analyze only the top part of the lane
 
     left_curverad = ((1 + (2 * left_fit[0] * y_eval + left_fit[1]) ** 2) ** 1.5) / np.absolute(2 * left_fit[0])
     right_curverad = ((1 + (2 * right_fit[0] * y_eval + right_fit[1]) ** 2) ** 1.5) / np.absolute(2 * right_fit[0])
@@ -304,9 +301,6 @@ def GetCurv(result, img, ploty, left_fit, right_fit, left_fitx, right_fitx):
     right_curverad = ((1 + (2 * right_fit_cr[0] * y_eval * ym_per_pix + right_fit_cr[1]) ** 2) ** 1.5) / np.absolute(
         2 * right_fit_cr[0])
     # Now our radius of curvature is in meters
-
-    #diff = np.abs(left_curverad - right_curverad)
-    # print(diff)
 
     #radius = round((float(left_curverad) + float(right_curverad)) / 2., 2)
     radius = right_curverad/left_curverad
@@ -338,15 +332,15 @@ def GetCurv(result, img, ploty, left_fit, right_fit, left_fitx, right_fitx):
     return  right_curverad,left_curverad, radius, lane_width, center_off
 
 
+
 def sanity_check(img, left_fit, right_fit):
-    """Decides whether the detectes lane is valid or not"""
+    """Decides whether the detected lane is valid or not"""
     ploty = np.linspace(0, img.shape[0] - 1, img.shape[0])  # makes evenly spaced points of the lane points
     left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2]
     right_fitx = right_fit[0] * ploty ** 2 + right_fit[1] * ploty + right_fit[2]
     global  first_lane
 
     right_c, left_c, radius, width, centeroff = GetCurv(img, img, ploty, left_fit, right_fit, left_fitx, right_fitx)
-
     if first_lane : # if the first lane is, than returns true
         first_lane=False
         return True
@@ -403,14 +397,14 @@ def process_adv(image):
     #return roi_image
 
     warped = perspective_transform(roi_image, s_mask, dest_mask)
-    #return warped
+   # return warped
     global  errors
     global GoodLane
     global first_lane
 
     left_fit =[]
     right_fit=[]
-    falsidx=720
+
     outimg=image
     if GoodLane:
         left_fit, right_fit, outimg = sliding_windown(warped,marginsize=50)  # returns the right and the left lane lines points
@@ -422,7 +416,7 @@ def process_adv(image):
     if sanity_check(image,left_fit,right_fit):
         result = draw_lines(image, warped, left_fit, right_fit, perspective=[s_mask, dest_mask],color=(0,255,0))
         GoodLane=True
-        LEFT_FIT.append(left_fit)
+        LEFT_FIT.append(left_fit) #good lanes are added to the history
         RIGHT_FIT.append(right_fit)
 
     else:
@@ -448,8 +442,7 @@ def process_adv(image):
 
     return result
 
-
-capture = cv.VideoCapture('challenge_video.mp4')
+capture = cv.VideoCapture('project_video.mp4')
 
 History = list()
 
@@ -465,13 +458,15 @@ first_lane=True
 counter = 0
 
 fps_start = timer()
-
+#fdb=0
 while capture.isOpened():
     ret, frame = capture.read()
     # if frame is read correctly ret is True
+
     frame = process_adv(frame)
     cv.imshow('frame', frame)
-
+    #print("frame:"+str(fdb))
+    #fdb+=1
 
     counter += 1
 

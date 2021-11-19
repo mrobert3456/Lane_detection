@@ -17,6 +17,7 @@ if (os.system("cl.exe")):
 
 def GrayScaleGPU(img):
     result = numpy.empty_like(img)
+    #gets the RGB channels
     R = img[:, :, 0].copy()
     G = img[:, :, 1].copy()
     B = img[:, :, 2].copy()
@@ -24,9 +25,11 @@ def GrayScaleGPU(img):
     height = img.shape[0]
     width = img.shape[1]
 
+    #gets the dimensions of the block
     dim_gridx = math.ceil(width / BLOCK_SIZE)
     dim_gridy = math.ceil(height / BLOCK_SIZE)
 
+    #Allocate memory on the gpu
     dev_R = cuda.mem_alloc(R.nbytes)
     dev_G = cuda.mem_alloc(G.nbytes)
     dev_B = cuda.mem_alloc(B.nbytes)
@@ -36,23 +39,53 @@ def GrayScaleGPU(img):
     cuda.memcpy_htod(dev_G, G)
     cuda.memcpy_htod(dev_B, B)
 
+    # Each thread will compute its corresponding cell
     mod = SourceModule("""
             __global__ void Convert_To_Gray(unsigned char * R, unsigned char * G, unsigned char * B, const unsigned int width, const unsigned int height)
             {
+                //Calculate indexes of each thread
                 const unsigned int row = threadIdx.y + blockIdx.y * blockDim.y;
                 const unsigned int col = threadIdx.x + blockIdx.x * blockDim.x;
-
+                
+                __shared__ unsigned char *R_shared;
+                __shared__  unsigned char * G_shared;
+                __shared__  unsigned char * B_shared;
+                
+                //copy datas to shared memory
+                if ((col+row)%1024 ==0)
+                {
+                    for(int i=0; i<row;i++)
+                    {
+                         const unsigned int idx = col+i*width;
+                         R_shared[idx%1024] =R[idx%1024];
+                         G_shared[idx%1024] =G[idx%1024];
+                         B_shared[idx%1024] =B[idx%1024];
+                    }
+                }
+                
                 if (row <height && col<width)
                 {
                     const unsigned int idx = col+row*width;
                     const unsigned char intensity = R[idx]*0.07+G[idx]*0.72+B[idx]*0.21;
 
-                    R[idx] = intensity;
-                    G[idx] = intensity;
-                    B[idx] = intensity;
+                    R_shared[idx] = intensity;
+                    G_shared[idx] = intensity;
+                    B_shared[idx] = intensity;
                  }
+                else if(row ==height && col==width)
+                {
+                 // last thread will copy shared memory to global memory
+                    for(int i=0; i<row;i++)
+                    {
+                         const unsigned int idx = col+i*width;
+                         R[idx%1024] =R_shared[idx%1024];
+                         G[idx%1024] =G_shared[idx%1024];
+                         B[idx%1024] =B_shared[idx%1024];
+                    }
+                }
                 else{
-                return;
+                    //if there are threads, which is unnecessary, the it simply returns
+                    return;
                 }
 
         }
@@ -61,18 +94,23 @@ def GrayScaleGPU(img):
 
     grayConv = mod.get_function("Convert_To_Gray")
 
+    #determine neccessary block count
+    # 1 block can handle max 1024 threads
+    #grid =collection of blocks
+    # block cannot communicate to each other
+    # block have limited shared memory, which is faster than global memory
     block_count = (height * width - 1) / BLOCK_SIZE * BLOCK_SIZE + 1
     grayConv(dev_R,
              dev_G,
              dev_B,
              numpy.uint32(width),
              numpy.uint32(height),
-             block=(BLOCK_SIZE, BLOCK_SIZE, 1),  # 1 blokk 32*32 -es-> tehát 1024 db szal van benne
-             grid=(dim_gridx, dim_gridy)  # blokkok osszessege
+             block=(BLOCK_SIZE, BLOCK_SIZE, 1), #1 block has 32*32 = 1024 threads
+             grid=(dim_gridx, dim_gridy)  # Collection of blocks
              )
 
-    # fullhd.jpg az 900*1600 as, ami = 1440000 pixel
-    # 1440000/1024 = 1407 kerekitve -> ez a block_count
+    # fullhd.jpg shape: 900*1600 so, it has = 1440000 pixels
+    # 1440000/1024 = 1407 rounded -> this would be the block count
 
     # copy result from gpu
     R_new = numpy.empty_like(R)
@@ -95,6 +133,7 @@ def GrayScaleGPU(img):
 def HistogramGPU(img):
     res = img[0, :]
     img_uj = img[int(img.shape[0] / 2):, :]
+    #shape of the image : 360*1280
     height = img.shape[0] / 2
     width = img.shape[1]
     dim_gridx = math.ceil(width / BLOCK_SIZE)
@@ -108,21 +147,21 @@ def HistogramGPU(img):
 
     cuda.memcpy_htod(dev_Hist, res)
     cuda.memcpy_htod(dev_kep, img_uj)
-
+    # Each threads sums the corresponding columns
     mod = SourceModule("""
                 __global__ void HistogramGPU(unsigned char * img,  unsigned char * Hist,const unsigned int height, const unsigned int width)
                 {
                     //const unsigned int sor = threadIdx.y + blockIdx.y * blockDim.y;
                     const unsigned int oszlop = threadIdx.x + blockIdx.x * blockDim.x;
                     
-                    //__shared__ float shared_kep[360][1280];
+                    //__shared__ float shared_kep[360][32];
                     
-                    //if (oszlop ==0)
+                   // if (oszlop%32 ==0)
                     //{
-                        //for(int i=0;i<height;i++)
+                      //for(int i=0;i<height;i++)
                         //{
-                         //   unsigned int idx = oszlop+i*width;
-                         //   shared_kep[i][oszlop]= img[idx];
+                          //  unsigned int idx = oszlop+i*width;
+                           //shared_kep[i][oszlop%32]= img[idx];
                        // }
                     //}
                     //__syncthreads();
@@ -134,11 +173,14 @@ def HistogramGPU(img):
                         for (int i=0; i<height; i++)
                         {
                             unsigned int idx = oszlop+i*width;
-                          //  sum+=shared_kep[i][oszlop];
+                            //sum+=shared_kep[i];
+                            //atomicAdd(&shared_kep[i][oszlop%32],img[idx]);
                           sum+=img[idx];
                         }
                          //*(Hist+oszlop)=sum;
-                         Hist[oszlop] =sum/width;
+                        //int seged = Hist[oszlop];
+                        //Hist[oszlop] =seged/width;
+                       Hist[oszlop] = sum/width;
                            
                     }
                     else

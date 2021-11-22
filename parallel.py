@@ -41,56 +41,43 @@ def GrayScaleGPU(img):
 
     # Each thread will compute its corresponding cell
     mod = SourceModule("""
-            __global__ void Convert_To_Gray(unsigned char * R, unsigned char * G, unsigned char * B, const unsigned int width, const unsigned int height)
-            {
-                //Calculate indexes of each thread
-                const unsigned int row = threadIdx.y + blockIdx.y * blockDim.y;
-                const unsigned int col = threadIdx.x + blockIdx.x * blockDim.x;
-                
-                __shared__ unsigned char *R_shared;
-                __shared__  unsigned char * G_shared;
-                __shared__  unsigned char * B_shared;
-                
-                //copy datas to shared memory
-                if ((col+row)%1024 ==0)
-                {
-                    for(int i=0; i<row;i++)
-                    {
-                         const unsigned int idx = col+i*width;
-                         R_shared[idx%1024] =R[idx%1024];
-                         G_shared[idx%1024] =G[idx%1024];
-                         B_shared[idx%1024] =B[idx%1024];
+               __global__ void Convert_To_Gray(unsigned char * R, unsigned char * G, unsigned char * B, const unsigned int width, const unsigned int height)
+               {
+                   //Calculate indexes of each thread
+                   const unsigned int row = threadIdx.y + blockIdx.y * blockDim.y;
+                   const unsigned int col = threadIdx.x + blockIdx.x * blockDim.x;
+
+                   __shared__ unsigned char *R_shared;
+                   __shared__  unsigned char * G_shared;
+                   __shared__  unsigned char * B_shared;
+                    
+                    //copy data to shared memory
+                   if (row%32 ==0 && col%32==0)
+                   {
+                       B_shared=B;
+                       R_shared=R;
+                       G_shared=G;
+                   }
+
+                  __syncthreads();
+
+                   if (row <height && col<width)
+                   {
+                       const unsigned int idx = col+row*width;
+                       const unsigned char intensity = R_shared[idx%1024]*0.07+G_shared[idx%1024]*0.72+B_shared[idx%1024]*0.21;
+
+                       R_shared[idx%1024] = intensity;
+                       G_shared[idx%1024] = intensity;
+                       B_shared[idx%1024] = intensity;
                     }
-                }
-                
-                if (row <height && col<width)
-                {
-                    const unsigned int idx = col+row*width;
-                    const unsigned char intensity = R[idx]*0.07+G[idx]*0.72+B[idx]*0.21;
+                   else{
+                       //if there are threads, which is unnecessary, the it simply returns
+                       return;
+                   }
 
-                    R_shared[idx] = intensity;
-                    G_shared[idx] = intensity;
-                    B_shared[idx] = intensity;
-                 }
-                else if(row ==height && col==width)
-                {
-                 // last thread will copy shared memory to global memory
-                    for(int i=0; i<row;i++)
-                    {
-                         const unsigned int idx = col+i*width;
-                         R[idx%1024] =R_shared[idx%1024];
-                         G[idx%1024] =G_shared[idx%1024];
-                         B[idx%1024] =B_shared[idx%1024];
-                    }
-                }
-                else{
-                    //if there are threads, which is unnecessary, the it simply returns
-                    return;
-                }
+           }
 
-        }
-
-    """)
+       """)
 
     grayConv = mod.get_function("Convert_To_Gray")
 

@@ -1,10 +1,13 @@
 import numpy as np
 import cv2 as cv
+import matplotlib.pylab as plt
+import glob
+import pickle
+import os
 import parallel
 from timeit import default_timer as timer
 
 def thresholding_pipeline(img, sobel_kernel=7, mag_thresh=(3, 255), s_thresh=(170, 255), mod = "HSV"):
-    """Combines the HSV and Sobel thresholding"""
     hsv_image = img
     if mod =="HSV":
         hsv_image = cv.cvtColor(img, cv.COLOR_RGB2HSV)  # converts the input image into hsv colour space
@@ -54,8 +57,8 @@ def perspective_transform(img, src_m, dest_m):
 
 def sliding_windown(img_w, marginsize):
     """Returns the left and the right lane line points"""
-    #histogram = np.sum(img_w[int(img_w.shape[0] / 2):, :], axis=0)
-    histogram = parallel.HistogramGPU(img_w) # gets the histogram of the image
+    histogram = np.sum(img_w[int(img_w.shape[0] / 2):, :], axis=0)
+    #histogram = parallel.HistogramGPU(img_w) # gets the histogram of the image
 
     # Creates an output image to draw on and visualize the result
     out_img = np.dstack((img_w, img_w, img_w)) * 255
@@ -149,7 +152,7 @@ def sliding_windown(img_w, marginsize):
     left_fit = np.polyfit(lefty, leftx,2)
     right_fit = np.polyfit(righty, rightx, 2)
 
-    return left_fit, right_fit, out_img
+    return left_fit, right_fit, out_img, left_lane_inds,right_lane_inds
 
 def region_of_interest(img):
     """Gets the ROI from the image"""
@@ -160,7 +163,7 @@ def region_of_interest(img):
     vertices = np.array([[(0, imshape[0]), (imshape[1] * .28, imshape[0] * .58), (imshape[1] * .62, imshape[0] * .58),
                        (imshape[1], imshape[0])]], dtype=np.int32)  # creates an array with the trapezoids verticies
 
-    cv.fillPoly(mask, vertices, 255)
+    cv.fillPoly(mask, vertices, (255,)*3)
     masked_image = cv.bitwise_and(img, mask)  # crops the original image with the mask
 
 
@@ -172,7 +175,7 @@ def region_of_interest(img):
     vert3 = np.array([[(300, imshape[0]), (imshape[1] * .48, imshape[0] * .77), (imshape[1] * .52, imshape[0] * .77),
                           (imshape[1] * .7, imshape[0])]], dtype=np.int32)
 
-    cv.fillPoly(mask2, vert3, 255)
+    cv.fillPoly(mask2, vert3, (255,)*3)
     mask2 = cv.bitwise_not(mask2)
 
     masked_image_v = cv.bitwise_and(masked_image, mask2)
@@ -328,11 +331,99 @@ def GetCurv(result, img, ploty, left_fit, right_fit, left_fitx, right_fitx):
     text = "radius = %s [m]\noffcenter = %s [m]\nwidth = %s [m]\nLeft_curve = %s\nRight_curve = %s" % (str(radius), str(center_off), str(lane_width),str(left_curverad), str(right_curverad))
     for i, line in enumerate(text.split('\n')):
         i = 50 + 20 * i
-        cv.putText(result, line, (0, i), cv.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255), 1, cv.LINE_AA)
+        cv.putText(result, line, (0, 200+i), cv.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255), 1, cv.LINE_AA)
 
     return  right_curverad,left_curverad, radius, lane_width, center_off
 
+def draw_lane_lines_regions( warped_img, left_line, right_line):
+    """
+    Returns an image where the computed left and right lane areas have been drawn on top of the original warped binary image
+    """
+    # Generate a polygon to illustrate the search window area
+    # And recast the x and y points into usable format for cv2.fillPoly()
+    margin = 50
+    ploty = np.linspace(0, warped_img.shape[0] - 1, warped_img.shape[0])
 
+    left_fitx = left_line[0] * ploty ** 2 + left_line[1] * ploty + left_line[2]
+    right_fitx = right_line[0] * ploty ** 2 + right_line[1] * ploty + right_line[2]
+
+    left_line_window1 = np.array([np.transpose(np.vstack([left_fitx - margin, ploty]))])
+    left_line_window2 = np.array([np.flipud(np.transpose(np.vstack([left_fitx + margin,
+                                                                    ploty])))])
+    left_line_pts = np.hstack((left_line_window1, left_line_window2))
+
+    right_line_window1 = np.array([np.transpose(np.vstack([right_fitx - margin, ploty]))])
+    right_line_window2 = np.array([np.flipud(np.transpose(np.vstack([right_fitx + margin,
+                                                                     ploty])))])
+    right_line_pts = np.hstack((right_line_window1, right_line_window2))
+
+    # Create RGB image from binary warped image
+    region_img = np.dstack((warped_img, warped_img, warped_img)) * 255
+
+    # Draw the lane onto the warped blank image
+    cv.fillPoly(region_img, np.int_([left_line_pts]), (0, 255, 0))
+    cv.fillPoly(region_img, np.int_([right_line_pts]), (0, 255, 0))
+
+    return region_img
+
+def draw_lines_hotspots(img,warped_img, left_lane_inds, right_lane_inds):
+    """
+    Returns a RGB image where the portions of the lane lines that were
+    identified by our pipeline are colored in yellow (left) and blue (right)
+    """
+    out_img = np.dstack((warped_img, warped_img, warped_img)) *255
+
+    nonzero = warped_img.nonzero()
+    nonzeroy = np.array(nonzero[0])
+    nonzerox = np.array(nonzero[1])
+
+    leftx = nonzerox[left_lane_inds]
+    lefty = nonzeroy[left_lane_inds]
+    rightx = nonzerox[right_lane_inds]
+    righty = nonzeroy[right_lane_inds]
+
+    out_img[lefty, leftx] = [255, 255, 0]
+    out_img[righty, rightx] = [0, 0, 255]
+
+    return out_img
+
+
+def combine_images(lane_area_img, lines_img, lines_regions_img, lane_hotspots_img, psp_color_img):
+    """
+    Returns a new image made up of the lane area image, and the remaining lane images are overlaid as
+    small images in a row at the top of the the new image
+    """
+    global small_img_size
+    global  small_img_x_offset
+    global  small_img_y_offset
+    small_lines = cv.resize(lines_img, small_img_size)
+    small_region = cv.resize(lines_regions_img, small_img_size)
+    small_hotspots = cv.resize(lane_hotspots_img, small_img_size)
+    small_color_psp = cv.resize(psp_color_img, small_img_size)
+
+
+    lane_area_img[small_img_y_offset: small_img_y_offset + small_img_size[1],
+    small_img_x_offset: small_img_x_offset + small_img_size[0]] = small_lines
+
+    start_offset_y = small_img_y_offset
+    start_offset_x = 2 * small_img_x_offset + small_img_size[0]
+
+    lane_area_img[start_offset_y: start_offset_y + small_img_size[1],
+    start_offset_x: start_offset_x + small_img_size[0]] = small_region
+
+    start_offset_y = small_img_y_offset
+    start_offset_x = 3 * small_img_x_offset + 2 * small_img_size[0]
+
+    lane_area_img[start_offset_y: start_offset_y + small_img_size[1],
+    start_offset_x: start_offset_x + small_img_size[0]] = small_hotspots
+
+    start_offset_y = small_img_y_offset
+    start_offset_x = 4 * small_img_x_offset + 3 * small_img_size[0]
+
+    lane_area_img[start_offset_y: start_offset_y + small_img_size[1],
+    start_offset_x: start_offset_x + small_img_size[0]] = small_color_psp
+
+    return lane_area_img
 
 def sanity_check(img, left_fit, right_fit):
     """Decides whether the detected lane is valid or not"""
@@ -384,8 +475,6 @@ def get_avg_lane():
     return avg_left_fitx, avg_right_fitx
 
 def process_adv(image):
-    """Methodology for detecting lanes"""
-    """Threshold the image - >Gets the ROI -> Perspective transform -> sliding window search -> draw lane- > return final image"""
     dest_mask = _createDestination()
     s_mask = _createSource()
 
@@ -407,15 +496,25 @@ def process_adv(image):
 
     left_fit =[]
     right_fit=[]
-
+    left_lane_inds =[]
+    right_lane_inds =[]
     outimg=image
     if GoodLane:
-        left_fit, right_fit, outimg = sliding_windown(warped,marginsize=50)  # returns the right and the left lane lines points
+        left_fit, right_fit, outimg,left_lane_inds, right_lane_inds = sliding_windown(warped,marginsize=50)  # returns the right and the left lane lines points
     else:
-        left_fit, right_fit, outimg= sliding_windown(warped, marginsize=100)  # returns the right and the left lane lines points
+        left_fit, right_fit, outimg,left_lane_inds, right_lane_inds = sliding_windown(warped, marginsize=100)  # returns the right and the left lane lines points
     #return outimg
     #result =image
-    # validate lane : if the lane is not valid then, itt will be red,and it will use the history
+
+    drawn_lines_regions = draw_lane_lines_regions(warped, left_fit, right_fit)
+    #cv.imshow('b',drawn_lines_regions)
+
+    drawn_hotspots = draw_lines_hotspots(image,warped, left_lane_inds, right_lane_inds)
+    #cv.imshow('c', drawn_hotspots)
+
+
+
+
     if sanity_check(image,left_fit,right_fit):
         result = draw_lines(image, warped, left_fit, right_fit, perspective=[s_mask, dest_mask],color=(0,255,0))
         GoodLane=True
@@ -442,13 +541,18 @@ def process_adv(image):
         GoodLane=False
 
         errors+=1
-
+    roi_og =region_of_interest(image)
+    warped_or = perspective_transform(roi_og, s_mask, dest_mask)
+    combined_lane_img = combine_images(result,outimg, drawn_lines_regions, drawn_hotspots, warped_or)
     return result
+
 
 capture = cv.VideoCapture('project_video.mp4')
 
 History = list()
-
+small_img_size = (256,144)
+small_img_x_offset=20
+small_img_y_offset=10
 LEFT_FIT = list()
 RIGHT_FIT = list()
 OFFC = list()

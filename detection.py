@@ -4,7 +4,7 @@ import matplotlib.pylab as plt
 import glob
 import pickle
 import os
-import parallel
+#import parallel
 from timeit import default_timer as timer
 
 def thresholding_pipeline(img, sobel_kernel=7, mag_thresh=(3, 255), s_thresh=(170, 255), mod = "HSV"):

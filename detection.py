@@ -388,10 +388,9 @@ def draw_lines_hotspots(img,warped_img, left_lane_inds, right_lane_inds):
     return out_img
 
 
-def combine_images(lane_area_img, lines_img, lines_regions_img, lane_hotspots_img, psp_color_img):
+def combine_images(orig_lane_img, lines_img, lines_regions_img, lane_hotspots_img, warped):
     """
-    Returns a new image made up of the lane area image, and the remaining lane images are overlaid as
-    small images in a row at the top of the the new image
+    Returns an image, where the lane detection steps are shown as in smaller windows on the original image
     """
     global small_img_size
     global  small_img_x_offset
@@ -399,31 +398,31 @@ def combine_images(lane_area_img, lines_img, lines_regions_img, lane_hotspots_im
     small_lines = cv.resize(lines_img, small_img_size)
     small_region = cv.resize(lines_regions_img, small_img_size)
     small_hotspots = cv.resize(lane_hotspots_img, small_img_size)
-    small_color_psp = cv.resize(psp_color_img, small_img_size)
+    warped_window = cv.resize(warped, small_img_size)
 
 
-    lane_area_img[small_img_y_offset: small_img_y_offset + small_img_size[1],
+    orig_lane_img[small_img_y_offset: small_img_y_offset + small_img_size[1],
     small_img_x_offset: small_img_x_offset + small_img_size[0]] = small_lines
 
     start_offset_y = small_img_y_offset
     start_offset_x = 2 * small_img_x_offset + small_img_size[0]
 
-    lane_area_img[start_offset_y: start_offset_y + small_img_size[1],
+    orig_lane_img[start_offset_y: start_offset_y + small_img_size[1],
     start_offset_x: start_offset_x + small_img_size[0]] = small_region
 
     start_offset_y = small_img_y_offset
     start_offset_x = 3 * small_img_x_offset + 2 * small_img_size[0]
 
-    lane_area_img[start_offset_y: start_offset_y + small_img_size[1],
+    orig_lane_img[start_offset_y: start_offset_y + small_img_size[1],
     start_offset_x: start_offset_x + small_img_size[0]] = small_hotspots
 
     start_offset_y = small_img_y_offset
     start_offset_x = 4 * small_img_x_offset + 3 * small_img_size[0]
 
-    lane_area_img[start_offset_y: start_offset_y + small_img_size[1],
-    start_offset_x: start_offset_x + small_img_size[0]] = small_color_psp
+    orig_lane_img[start_offset_y: start_offset_y + small_img_size[1],
+    start_offset_x: start_offset_x + small_img_size[0]] = warped_window
 
-    return lane_area_img
+    return orig_lane_img
 
 def sanity_check(img, left_fit, right_fit):
     """Decides whether the detected lane is valid or not"""
@@ -549,15 +548,15 @@ def process_adv(image):
 
 capture = cv.VideoCapture('project_video.mp4')
 
-History = list()
+
 small_img_size = (256,144)
 small_img_x_offset=20
 small_img_y_offset=10
-LEFT_FIT = list()
-RIGHT_FIT = list()
-OFFC = list()
-WidthH = list()
-errors = 0
+
+LEFT_FIT = list() # history for the left_fit coefficents
+RIGHT_FIT = list() #history for the right_fit coefficents
+
+errors = 0 # error counter
 GoodLane = True
 first_lane=True
 

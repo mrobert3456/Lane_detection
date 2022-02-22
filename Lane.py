@@ -106,6 +106,9 @@ class Lane:
         self.rightDiff=0
 
         self.canDraw=False
+        self.left_kalmanFilter = WindowFilter()
+        self.right_kalmanFilter = WindowFilter()
+
 
     def SetImg(self,img):
         self.image = img
@@ -169,6 +172,10 @@ class Lane:
         leftx_current = leftx_base
         rightx_current = rightx_base
 
+        self.left_kalmanFilter.set_init_poz(leftx_base)
+        self.right_kalmanFilter.set_init_poz(rightx_base)
+        min_lanepoint_goodness = -40
+
         # Set the width of the windows +/- margin
         margin = marginsize
 
@@ -216,12 +223,15 @@ class Lane:
             # If you found > minpix pixels, recenter next window on their mean position
 
             if len(good_left_inds) > minpix:
-                leftx_current = int(np.mean(nonzerox[good_left_inds]))
-
+                #leftx_current = int(np.mean(nonzerox[good_left_inds]))
+                self.left_kalmanFilter.update(leftx_current)
+                leftx_current =int(self.left_kalmanFilter.get_position())
 
 
             if len(good_right_inds) > minpix:
-                rightx_current = int(np.mean(nonzerox[good_right_inds]))
+                #rightx_current = int(np.mean(nonzerox[good_right_inds]))
+                self.right_kalmanFilter.update(leftx_current)
+                rightx_current =int(self.right_kalmanFilter.get_position())
 
 
         # Concatenate the arrays of indices
@@ -530,7 +540,7 @@ class Lane:
 
 
 class WindowFilter:
-    def __init__(self, pos_init=0.0, meas_variance=100, process_variance=1, uncertainty_init=2 ** 30):
+    def __init__(self, pos_init=0.0, meas_variance=100, process_variance=0.1, uncertainty_init=2 ** 30):
         """
         A one dimensional Kalman filter tuned to track the position of a window.
         State variable:   = [position,

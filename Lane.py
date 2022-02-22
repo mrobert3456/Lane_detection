@@ -105,6 +105,8 @@ class Lane:
         self.leftDiff=0
         self.rightDiff=0
 
+        self.canDraw=False
+
     def SetImg(self,img):
         self.image = img
         return
@@ -155,11 +157,6 @@ class Lane:
         leftx_base = np.argmax(histogram[:midpoint])
         rightx_base = np.argmax(histogram[midpoint:]) + midpoint
 
-        self.prev_Left_Windows.append(leftx_base)
-        self.prev_Right_Windows.append(rightx_base)
-        # Choose the number of sliding windows
-        #nwindows = 9
-
         # Set height of windows
         window_height = int(img_w.shape[0] / self.window_count)
 
@@ -171,7 +168,6 @@ class Lane:
         # Current positions to be updated for each window
         leftx_current = leftx_base
         rightx_current = rightx_base
-
 
         # Set the width of the windows +/- margin
         margin = marginsize
@@ -202,6 +198,7 @@ class Lane:
                 break
 
             # Draw the windows on the visualization image
+
             recone = cv.rectangle(out_img, (win_xleft_low, win_y_low), (win_xleft_high, win_y_high), color, 2)
             rectwo = cv.rectangle(out_img, (win_xright_low, win_y_low), (win_xright_high, win_y_high), color, 2)
 
@@ -217,11 +214,15 @@ class Lane:
             right_lane_inds.append(good_right_inds)
 
             # If you found > minpix pixels, recenter next window on their mean position
+
             if len(good_left_inds) > minpix:
                 leftx_current = int(np.mean(nonzerox[good_left_inds]))
 
+
+
             if len(good_right_inds) > minpix:
                 rightx_current = int(np.mean(nonzerox[good_right_inds]))
+
 
         # Concatenate the arrays of indices
         left_lane_inds = np.concatenate(left_lane_inds)
@@ -243,16 +244,21 @@ class Lane:
         #rightx,righty =self.checkPoints(rightx,righty,diffrx,diffry)
 
         # Fit a second order polynomial to each
-        left_fit = np.polyfit(lefty, leftx, 2)
-        right_fit = np.polyfit(righty, rightx, 2)
+        left_fit =[]
+        right_fit=[]
+        ploty = np.linspace(0, self.image.shape[0] - 1,self.image.shape[0])  # makes evenly spaced points of the lane points
+        if len(leftx)>0 or len(lefty)>0 :
+            left_fit = np.polyfit(lefty, leftx, 2)
+            self.left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2]
 
 
+        if len(rightx) > 0 or len(righty) > 0:
+            right_fit = np.polyfit(righty, rightx, 2)
+            self.right_fitx = right_fit[0] * ploty ** 2 + right_fit[1] * ploty + right_fit[2]
 
-        ploty = np.linspace(0, self.image.shape[0] - 1, self.image.shape[0])  # makes evenly spaced points of the lane points
-        self.left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2]
-        self.right_fitx = right_fit[0] * ploty ** 2 + right_fit[1] * ploty + right_fit[2]
-
-        self.left_curverad,self.right_curverad,self.center_off = self.GetCurv(ploty,left_fit,right_fit)
+        if len(left_fit)>0 and len(right_fit):
+            self.canDraw = True
+            self.left_curverad,self.right_curverad,self.center_off = self.GetCurv(ploty,left_fit,right_fit)
 
         return left_fit, right_fit, out_img, left_lane_inds, right_lane_inds
 
@@ -271,99 +277,102 @@ class Lane:
         """ Draws the lane to the original image"""
         #img =self.image
         # Creates an image to draw the lines on
-        warp_zero = np.zeros_like(img_w).astype(np.uint8)
-        color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
+        if self.canDraw:
+            warp_zero = np.zeros_like(img_w).astype(np.uint8)
+            color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
 
-        # Find the inflection point of the lane, so the polynom can be corrected
+            # Find the inflection point of the lane, so the polynom can be corrected
 
-        #diff2_l = np.gradient(np.gradient(self.left_fit, 1), 1)  # gets the second derevative to determine inflection point
-        #diff2_r = np.gradient(np.gradient(self.right_fit, 1), 1)  # gets the second derevative to determine inflection point
+            #diff2_l = np.gradient(np.gradient(self.left_fit, 1), 1)  # gets the second derevative to determine inflection point
+            #diff2_r = np.gradient(np.gradient(self.right_fit, 1), 1)  # gets the second derevative to determine inflection point
 
-        ploty = np.linspace(0, self.image.shape[0] - 1, self.image.shape[0])  # makes evenly spaced points of the lane points
+            ploty = np.linspace(0, self.image.shape[0] - 1, self.image.shape[0])  # makes evenly spaced points of the lane points
 
-        diff_left = np.gradient(self.left_fitx, 1)
-        sdiff_left = np.gradient(np.gradient(diff_left, 1), 1)
+            diff_left = np.gradient(self.left_fitx, 1)
+            sdiff_left = np.gradient(np.gradient(diff_left, 1), 1)
 
-        diff_right = np.gradient(self.right_fitx, 1)
-        sdiff_right = np.gradient(np.gradient(diff_right, 1), 1)
+            diff_right = np.gradient(self.right_fitx, 1)
+            sdiff_right = np.gradient(np.gradient(diff_right, 1), 1)
 
-        infl_left = -1
-        infl_right = -1
+            infl_left = -1
+            infl_right = -1
 
-        positive = diff_left[0] > 0 and diff_right[0] > 0
+            positive = diff_left[0] > 0 and diff_right[0] > 0
 
-        ploty = ploty[100:]
-        self.left_fitx = self.left_fitx[100:]
-        self.right_fitx = self.right_fitx[100:]
+            ploty = ploty[:600]
+            self.left_fitx = self.left_fitx[:600]
+            self.right_fitx = self.right_fitx[:600]
 
-        # Recast the x and y points into usable format for cv.fillPoly()
-        pts_left = np.array([np.transpose(np.vstack([self.left_fitx, ploty]))])
-        pts_right = np.array([np.flipud(np.transpose(np.vstack([self.right_fitx, ploty])))])
+            # Recast the x and y points into usable format for cv.fillPoly()
+            pts_left = np.array([np.transpose(np.vstack([self.left_fitx, ploty]))])
+            pts_right = np.array([np.flipud(np.transpose(np.vstack([self.right_fitx, ploty])))])
 
-        pts = np.hstack((pts_left, pts_right))
+            pts = np.hstack((pts_left, pts_right))
 
-        # Draw the lane onto the warped blank image
-        cv.fillPoly(color_warp, np.int_([pts]), color)
+            # Draw the lane onto the warped blank image
+            cv.fillPoly(color_warp, np.int_([pts]), color)
 
-        # Warp the blank back to original image space using inverse perspective matrix
-        newwarp = self.perspectiveT.perspective_transform(color_warp, perspective[1], perspective[0])
+            # Warp the blank back to original image space using inverse perspective matrix
+            newwarp = self.perspectiveT.perspective_transform(color_warp, perspective[1], perspective[0])
 
-        # Combine the result with the original image
-        result = cv.addWeighted(self.image, 1, newwarp, 0.2, 0)
-        return result
+            # Combine the result with the original image
+            result = cv.addWeighted(self.image, 1, newwarp, 0.2, 0)
+            return result
+        return self.image
 
     def draw_lines_fromHistory(self,img_w, left_fit, right_fit, perspective,color):
         """ Draws the lane to the original image"""
         # img =self.image
         # Creates an image to draw the lines on
-        warp_zero = np.zeros_like(img_w).astype(np.uint8)
-        color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
+        if len(left_fit)>0 and len(right_fit)>0:
+            warp_zero = np.zeros_like(img_w).astype(np.uint8)
+            color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
 
-        # Find the inflection point of the lane, so the polynom can be corrected
+            # Find the inflection point of the lane, so the polynom can be corrected
 
-        #diff2_l = np.gradient(np.gradient(left_fit, 1), 1)  # gets the second derevative to determine inflection point
-        #diff2_r = np.gradient(np.gradient(right_fit, 1), 1)  # gets the second derevative to determine inflection point
+            #diff2_l = np.gradient(np.gradient(left_fit, 1), 1)  # gets the second derevative to determine inflection point
+            #diff2_r = np.gradient(np.gradient(right_fit, 1), 1)  # gets the second derevative to determine inflection point
 
-        ploty = np.linspace(0, self.image.shape[0] - 1, self.image.shape[0])  # makes evenly spaced points of the lane points
-
-
-        # ploty = np.linspace(0, img.shape[0] - 1, img.shape[0])  # makes evenly spaced points of the lane points
-        left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2]  # left polynom
-        right_fitx = right_fit[0] * ploty ** 2 + right_fit[1] * ploty + right_fit[2]  # right polynom
-
-        diff_left = np.gradient(left_fitx, 1)
-        #sdiff_left = np.gradient(np.gradient(diff_left, 1), 1)
-
-        diff_right = np.gradient(right_fitx, 1)
-        #sdiff_right = np.gradient(np.gradient(diff_right, 1), 1)
-
-        infl_left = -1
-        infl_right = -1
-
-        positive = diff_left[0] > 0 and diff_right[0] > 0
-
-        ploty = ploty[100:]
-        left_fitx = left_fitx[100:]
-        right_fitx = right_fitx[100:]
+            ploty = np.linspace(0, self.image.shape[0] - 1, self.image.shape[0])  # makes evenly spaced points of the lane points
 
 
-        # Recast the x and y points into usable format for cv.fillPoly()
-        pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
-        pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
+            # ploty = np.linspace(0, img.shape[0] - 1, img.shape[0])  # makes evenly spaced points of the lane points
+            left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2]  # left polynom
+            right_fitx = right_fit[0] * ploty ** 2 + right_fit[1] * ploty + right_fit[2]  # right polynom
 
-        pts = np.hstack((pts_left, pts_right))
+            diff_left = np.gradient(left_fitx, 1)
+            #sdiff_left = np.gradient(np.gradient(diff_left, 1), 1)
 
-        # Draw the lane onto the warped blank image
-        cv.fillPoly(color_warp, np.int_([pts]), color)
+            diff_right = np.gradient(right_fitx, 1)
+            #sdiff_right = np.gradient(np.gradient(diff_right, 1), 1)
 
-        # Warp the blank back to original image space using inverse perspective matrix
-        newwarp = self.perspectiveT.perspective_transform(color_warp, perspective[1], perspective[0])
+            infl_left = -1
+            infl_right = -1
 
-        # Combine the result with the original image
-        result = cv.addWeighted(self.image, 1, newwarp, 0.2, 0)
+            positive = diff_left[0] > 0 and diff_right[0] > 0
 
-        return result
+            ploty = ploty[:600]
+            left_fitx = left_fitx[:600]
+            right_fitx = right_fitx[:600]
 
+
+            # Recast the x and y points into usable format for cv.fillPoly()
+            pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
+            pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
+
+            pts = np.hstack((pts_left, pts_right))
+
+            # Draw the lane onto the warped blank image
+            cv.fillPoly(color_warp, np.int_([pts]), color)
+
+            # Warp the blank back to original image space using inverse perspective matrix
+            newwarp = self.perspectiveT.perspective_transform(color_warp, perspective[1], perspective[0])
+
+            # Combine the result with the original image
+            result = cv.addWeighted(self.image, 1, newwarp, 0.2, 0)
+
+            return result
+        return self.image
     def GetCurv(self,ploty, left_fit, right_fit):
         """Gets the curvature , radius, lane width, and center offset"""
         y_eval = np.max(ploty)  # Analyze only the top part of the lane
@@ -402,23 +411,23 @@ class Lane:
         # And recast the x and y points into usable format for cv2.fillPoly()
         margin = 50
         ploty = np.linspace(0, warped_img.shape[0] - 1, warped_img.shape[0])
-
-        left_line_window1 = np.array([np.transpose(np.vstack([self.left_fitx - margin, ploty]))])
-        left_line_window2 = np.array([np.flipud(np.transpose(np.vstack([self.left_fitx + margin,
-                                                                        ploty])))])
-        left_line_pts = np.hstack((left_line_window1, left_line_window2))
-
-        right_line_window1 = np.array([np.transpose(np.vstack([self.right_fitx - margin, ploty]))])
-        right_line_window2 = np.array([np.flipud(np.transpose(np.vstack([self.right_fitx + margin,
-                                                                         ploty])))])
-        right_line_pts = np.hstack((right_line_window1, right_line_window2))
-
         # Create RGB image from binary warped image
         region_img = np.dstack((warped_img, warped_img, warped_img)) * 255
 
-        # Draw the lane onto the warped blank image
-        cv.fillPoly(region_img, np.int_([left_line_pts]), (0, 255, 0))
-        cv.fillPoly(region_img, np.int_([right_line_pts]), (0, 255, 0))
+        if self.canDraw:
+            left_line_window1 = np.array([np.transpose(np.vstack([self.left_fitx - margin, ploty]))])
+            left_line_window2 = np.array([np.flipud(np.transpose(np.vstack([self.left_fitx + margin,
+                                                                            ploty])))])
+            left_line_pts = np.hstack((left_line_window1, left_line_window2))
+
+            right_line_window1 = np.array([np.transpose(np.vstack([self.right_fitx - margin, ploty]))])
+            right_line_window2 = np.array([np.flipud(np.transpose(np.vstack([self.right_fitx + margin,
+                                                                             ploty])))])
+            right_line_pts = np.hstack((right_line_window1, right_line_window2))
+
+            # Draw the lane onto the warped blank image
+            cv.fillPoly(region_img, np.int_([left_line_pts]), (0, 255, 0))
+            cv.fillPoly(region_img, np.int_([right_line_pts]), (0, 255, 0))
 
         return region_img
 
@@ -428,18 +437,19 @@ class Lane:
         identified by our pipeline are colored in blue (left) and red (right)
         """
         out_img = np.dstack((warped_img, warped_img, warped_img)) * 255
+        if self.canDraw:
 
-        nonzero = warped_img.nonzero()
-        nonzeroy = np.array(nonzero[0])
-        nonzerox = np.array(nonzero[1])
+            nonzero = warped_img.nonzero()
+            nonzeroy = np.array(nonzero[0])
+            nonzerox = np.array(nonzero[1])
 
-        leftx = nonzerox[left_lane_inds]
-        lefty = nonzeroy[left_lane_inds]
-        rightx = nonzerox[right_lane_inds]
-        righty = nonzeroy[right_lane_inds]
+            leftx = nonzerox[left_lane_inds]
+            lefty = nonzeroy[left_lane_inds]
+            rightx = nonzerox[right_lane_inds]
+            righty = nonzeroy[right_lane_inds]
 
-        out_img[lefty, leftx] = [255, 255, 0]
-        out_img[righty, rightx] = [0, 0, 255]
+            out_img[lefty, leftx] = [255, 255, 0]
+            out_img[righty, rightx] = [0, 0, 255]
 
         return out_img
 
@@ -458,8 +468,7 @@ class Lane:
         start_offset_y = self.small_img_y_offset
         start_offset_x = 2 * self.small_img_x_offset + self.small_img_size[0]
 
-        orig_lane_img[start_offset_y: start_offset_y + self.small_img_size[1],
-        start_offset_x: start_offset_x + self.small_img_size[0]] = small_region
+        orig_lane_img[start_offset_y: start_offset_y + self.small_img_size[1],start_offset_x: start_offset_x + self.small_img_size[0]] = small_region
 
         start_offset_y = self.small_img_y_offset
         start_offset_x = 3 * self.small_img_x_offset + 2 * self.small_img_size[0]
@@ -474,18 +483,18 @@ class Lane:
         start_offset_x: start_offset_x + self.small_img_size[0]] = warped_window
 
         return orig_lane_img
-
     def sanity_check(self):
         """Decides whether the detected lane is valid or not"""
-        #return True
-        if self.lane_width > 3.4 or self.lane_width < 2.2:
-            return False
-
-        if self.right_curverad < 1000 and self.left_curverad < 1000 and self.right_curverad > 100 and self.left_curverad > 100:
-            if self.radius > 2 or self.radius < 0.02:
-                return False
-
         return True
+        if self.canDraw:
+            if self.lane_width > 3.4 or self.lane_width < 2.0:
+                return False
+            #if self.right_curverad < 1000 and self.left_curverad < 1000 and self.right_curverad > 100 and self.left_curverad > 100:
+            if self.radius > 2 or self.radius < 0.2:
+                return False
+            return True
+        else:
+            return False
 
     def region_of_interest(self, img):
         """Gets the ROI from the image"""
@@ -494,8 +503,8 @@ class Lane:
         imshape = img.shape
 
         vertices = np.array(
-             [[(0, imshape[0]), (imshape[1] * .40, imshape[0] * .45), (imshape[1] * .58, imshape[0] * .45),
-               (imshape[1], imshape[0])]], dtype=np.int32)  # creates an array with the trapezoids verticies
+             [[(0, imshape[0]*.85), (imshape[1] * .40, imshape[0] * .45), (imshape[1] * .48, imshape[0] * .45),
+               (imshape[1], imshape[0]*.85)]], dtype=np.int32)  # creates an array with the trapezoids verticies
 
         vertices4 = np.array(
             [[(0, imshape[0]), (imshape[1] * .38, imshape[0] * .65), (imshape[1] * .58, imshape[0] * .65),
@@ -509,19 +518,19 @@ class Lane:
         #                     (imshape[1] * .7, imshape[0])]], dtype=np.int32)
 
         vert3 = np.array(
-            [[(300, imshape[0]), (imshape[1] * .48, imshape[0] * .77), (imshape[1] * .52, imshape[0] * .77),
+            [[(300, imshape[0]), (imshape[1] * .45, imshape[0] * .65), (imshape[1] * .52, imshape[0] * .65),
               (imshape[1] * .7, imshape[0])]], dtype=np.int32)
 
         cv.fillPoly(mask2, vert3, (255,) * 3)
         mask2 = cv.bitwise_not(mask2)
 
         masked_image_v = cv.bitwise_and(masked_image, mask2)
-        return masked_image
+        return masked_image_v
 
 
 
 class WindowFilter:
-    def __init__(self, pos_init=0.0, meas_variance=50, process_variance=1, uncertainty_init=2 ** 30):
+    def __init__(self, pos_init=0.0, meas_variance=100, process_variance=1, uncertainty_init=2 ** 30):
         """
         A one dimensional Kalman filter tuned to track the position of a window.
         State variable:   = [position,
@@ -574,3 +583,6 @@ class WindowFilter:
 
     def get_position(self):
         return self.kf.x[0]
+
+    def set_init_poz(self, pos):
+        self.kf.x = np.array([pos, 0])

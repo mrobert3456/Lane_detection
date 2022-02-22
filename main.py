@@ -12,7 +12,7 @@ laneProcess = Lane(perspective)
 Thresholder =ImgThreshold()
 
 GoodLane = True
-capture = cv.VideoCapture('ts_test.mp4')
+capture = cv.VideoCapture('higwaytest.mp4')
 # FPS counter
 counter = 0
 fps_start = timer()
@@ -50,11 +50,11 @@ def Process_adv(image):
 
 
     drawn_lines_regions = laneProcess.draw_lane_lines_regions(warped)
-    # cv.imshow('b',drawn_lines_regions)
-
+    #cv.imshow('b',drawn_lines_regions)
+    #return drawn_lines_regions
     drawn_hotspots = laneProcess.draw_lines_hotspots(warped, left_lane_inds, right_lane_inds)
-    # cv.imshow('c', drawn_hotspots)
-
+    #cv.imshow('c', drawn_hotspots)
+    #return drawn_hotspots
     if laneProcess.sanity_check() or firstLane:
         result = laneProcess.draw_lines(warped, perspective=[s_mask, dest_mask], color=(0, 255, 0))
         GoodLane = True
@@ -70,7 +70,8 @@ def Process_adv(image):
         firstLane=False
 
     else:
-        if laneHistory.getError()>12:
+        GoodLane = False
+        if laneHistory.getError()>60:
             laneHistory.setError(0)
             firstLane=True
             prev_l =laneHistory.GetLeft_fit()[-1]
@@ -82,14 +83,16 @@ def Process_adv(image):
             laneHistory.SetLeft_fit(prev_l)
             laneHistory.SetRight_fit(prev_r)
 
-        result = laneProcess.draw_lines_fromHistory( warped, laneHistory.GetLeft_fit()[-1], laneHistory.GetRight_fit()[-1], perspective=[s_mask, dest_mask],color=(0, 255, 0))
-        GoodLane = False
-        laneHistory.incrementError()
-        laneHistory.putHistoryDataOnScreen(result)
-
+        if len(laneHistory.GetLeft_fit()) >0 and len(laneHistory.GetRight_fit()):
+            result = laneProcess.draw_lines_fromHistory( warped, laneHistory.GetLeft_fit()[-1], laneHistory.GetRight_fit()[-1], perspective=[s_mask, dest_mask],color=(0, 255, 255))
+            laneHistory.incrementError()
+            laneHistory.putHistoryDataOnScreen(result)
+        else:
+            result = image
     roi_og = laneProcess.region_of_interest(image)
     warped_or = perspective.perspective_transform(roi_og, s_mask, dest_mask)
     laneProcess.combine_images(result, outimg, drawn_lines_regions, drawn_hotspots, warped_or)
+    laneProcess.canDraw=False
     return result
 
 while capture.isOpened():
@@ -97,8 +100,8 @@ while capture.isOpened():
     # if frame is read correctly ret is True
     frame =cv.resize(frame,(1280,720))
     frame = Process_adv(frame)
-    vmi = frame.shape[0]
-    vmi3 = frame.shape[1]
+    #vmi = frame.shape[0]
+    #vmi3 = frame.shape[1]
     cv.imshow('frame', frame)
     #print("frame:"+str(fdb))
     #fdb+=1

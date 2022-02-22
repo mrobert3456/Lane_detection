@@ -34,8 +34,8 @@ class Perspective:
         """Returns a matrix with the quadrangle indicies from the original image """
         # _imageSize = (1280, 720)
         xOffsetBottom = 100 #200
-        xOffsetMiddle =375 #595
-        yOffset = 450#450
+        xOffsetMiddle =300 #595
+        yOffset = 375#450
         sourceBottomLeft = (xOffsetBottom, self.image.shape[0])
         sourceBottomRight = (self.image.shape[1] - xOffsetBottom, self.image.shape[0])
         sourceTopLeft = (xOffsetMiddle, yOffset)

@@ -1,3 +1,4 @@
+
 import numpy as np
 import cv2 as cv
 from filterpy.common import Q_discrete_white_noise
@@ -82,7 +83,7 @@ class LaneHistory:
 class Lane:
     def __init__(self,persp_t):
         self.image= []
-        self.window_count=9
+        self.window_count=15
         self.small_img_size = (256, 144)
         self.small_img_x_offset = 20
         self.small_img_y_offset = 10
@@ -108,6 +109,7 @@ class Lane:
         self.canDraw=False
         self.left_kalmanFilter = WindowFilter()
         self.right_kalmanFilter = WindowFilter()
+
 
 
     def SetImg(self,img):
@@ -172,6 +174,10 @@ class Lane:
         leftx_current = leftx_base
         rightx_current = rightx_base
 
+        if leftx_current==0:
+            leftx_current = midpoint-250
+
+        self.prev_Left_Windows.append(leftx_current)
         self.left_kalmanFilter.set_init_poz(leftx_base)
         self.right_kalmanFilter.set_init_poz(rightx_base)
         min_lanepoint_goodness = -40
@@ -186,6 +192,7 @@ class Lane:
         left_lane_inds = []
         right_lane_inds = []
         color = (0, 255, 0)  # green
+        db=0
         # Step through the windows one by one
         for window in range(self.window_count):
             # Identify window boundaries in x and y (and right and left)
@@ -198,11 +205,6 @@ class Lane:
             win_xright_high = rightx_current + margin
 
             # indentify whether the left and the right windows are intersected
-            if win_xleft_low >= win_xright_low and win_xleft_high >= win_xright_high:
-                win_xleft_low -= 60
-                win_xleft_high -= 60
-                color = (255, 0, 0)  # Red
-                break
 
             # Draw the windows on the visualization image
 
@@ -224,14 +226,23 @@ class Lane:
 
             if len(good_left_inds) > minpix:
                 #leftx_current = int(np.mean(nonzerox[good_left_inds]))
-                self.left_kalmanFilter.update(leftx_current)
-                leftx_current =int(self.left_kalmanFilter.get_position())
-
-
+                self.left_kalmanFilter.update(rightx_current)
+                seged =int(self.left_kalmanFilter.get_position())
+                if seged >0:
+                    leftx_current=seged
+                else:
+                    leftx_current =int(np.mean(nonzerox[good_left_inds]))
             if len(good_right_inds) > minpix:
                 #rightx_current = int(np.mean(nonzerox[good_right_inds]))
                 self.right_kalmanFilter.update(leftx_current)
-                rightx_current =int(self.right_kalmanFilter.get_position())
+                seged =int(self.right_kalmanFilter.get_position())
+
+                if seged >0:
+                    rightx_current=seged
+                else:
+                    rightx_current =int(np.mean(nonzerox[good_left_inds]))
+
+
 
 
         # Concatenate the arrays of indices
@@ -244,11 +255,26 @@ class Lane:
         rightx = nonzerox[right_lane_inds]
         righty = nonzeroy[right_lane_inds]
 
-        difflx= np.diff(leftx)
-        diffly = np.diff(lefty)
+        #use the other correctly detected lane line
+        #if len(leftx)<200 and len(rightx)>100:
+        #    leftx = np.zeros_like(rightx)
+        #    kul = 1280-rightx
+        #    leftx+=kul-130
+        #    lefty=righty
 
-        diffrx =np.diff(rightx)
-        diffry =np.diff(righty)
+        #if len(rightx) < 200 and len(leftx) > 100:
+        #    rightx = np.zeros_like(leftx)
+        #    kul = 1280 - leftx
+        #    rightx += kul -100
+        #    righty = lefty
+
+
+
+        #difflx= np.diff(leftx)
+        #diffly = np.diff(lefty)
+
+        #diffrx =np.diff(rightx)
+        #diffry =np.diff(righty)
 
         #leftx,lefty =self.checkPoints(leftx,lefty,difflx,diffly)
         #rightx,righty =self.checkPoints(rightx,righty,diffrx,diffry)
@@ -495,7 +521,7 @@ class Lane:
         return orig_lane_img
     def sanity_check(self):
         """Decides whether the detected lane is valid or not"""
-        return True
+        #return True
         if self.canDraw:
             if self.lane_width > 3.4 or self.lane_width < 2.0:
                 return False

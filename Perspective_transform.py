@@ -26,15 +26,15 @@ class Perspective:
         xOffset = self.image.shape[1] / 4
         destinationBottomLeft = (xOffset, self.image.shape[0])
         destinationBottomRight = (self.image.shape[1] - xOffset, self.image.shape[0])
-        destinationTopLeft = (xOffset, 0)
-        destinationTopRight = (self.image.shape[1] - xOffset, 0)
+        destinationTopLeft = (xOffset, 70)
+        destinationTopRight = (self.image.shape[1] - xOffset, 70)
         return np.float32([destinationBottomLeft, destinationTopLeft, destinationTopRight, destinationBottomRight])
 
     def setSource(self):
         """Returns a matrix with the quadrangle indicies from the original image """
         # _imageSize = (1280, 720)
         xOffsetBottom = 100 #200
-        xOffsetMiddle =300 #595
+        xOffsetMiddle =475 #595
         yOffset = 375#450
         sourceBottomLeft = (xOffsetBottom, self.image.shape[0])
         sourceBottomRight = (self.image.shape[1] - xOffsetBottom, self.image.shape[0])

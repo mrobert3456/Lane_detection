@@ -38,14 +38,17 @@ def Process_adv(image):
     warped = perspective.perspective_transform(roi_image, s_mask, dest_mask)
     #return blurred
     #return warped
+
+    blurred = cv.medianBlur(warped,3)
+    #return blurred
     global GoodLane
     global  firstLane
 
     #if the lane is good then the marginsize =50, else marginsize=100
     if GoodLane:
-        left_fit, right_fit, outimg,left_lane_inds, right_lane_inds = laneProcess.sliding_windown(warped,marginsize=50)  # returns the right and the left lane lines points
+        left_fit, right_fit, outimg,left_lane_inds, right_lane_inds = laneProcess.sliding_windown(warped,marginsize=25)  # returns the right and the left lane lines points
     else:
-        left_fit, right_fit, outimg,left_lane_inds, right_lane_inds = laneProcess.sliding_windown(warped, marginsize=100)  # returns the right and the left lane lines points
+        left_fit, right_fit, outimg,left_lane_inds, right_lane_inds = laneProcess.sliding_windown(warped, marginsize=50)  # returns the right and the left lane lines points
     #return outimg
 
 

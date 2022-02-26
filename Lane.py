@@ -523,11 +523,13 @@ class Lane:
         """Decides whether the detected lane is valid or not"""
         #return True
         if self.canDraw:
-            if self.lane_width > 3.4 or self.lane_width < 2.0:
+            if self.lane_width > 2.8 or self.lane_width < 2.0:
                 return False
             #if self.right_curverad < 1000 and self.left_curverad < 1000 and self.right_curverad > 100 and self.left_curverad > 100:
             if self.radius > 2 or self.radius < 0.2:
                 return False
+            if self.center_off<0:
+                return  False
             return True
         else:
             return False
@@ -539,7 +541,7 @@ class Lane:
         imshape = img.shape
 
         vertices = np.array(
-             [[(0, imshape[0]*.85), (imshape[1] * .40, imshape[0] * .45), (imshape[1] * .48, imshape[0] * .45),
+             [[(0, imshape[0]*.85), (imshape[1] * .40, imshape[0] * .45), (imshape[1] * .55, imshape[0] * .45),
                (imshape[1], imshape[0]*.85)]], dtype=np.int32)  # creates an array with the trapezoids verticies
 
         vertices4 = np.array(

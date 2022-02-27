@@ -227,22 +227,20 @@ class Lane:
             if len(good_left_inds) > minpix:
                 #leftx_current = int(np.mean(nonzerox[good_left_inds]))
                 self.left_kalmanFilter.update(rightx_current)
-                seged =int(self.left_kalmanFilter.get_position())
-                if seged >0:
-                    leftx_current=seged
+                rkf =int(self.left_kalmanFilter.get_position())
+                if rkf >0:
+                    leftx_current=rkf
                 else:
-                    leftx_current =int(np.mean(nonzerox[good_left_inds]))
+                   leftx_current =int(np.mean(nonzerox[good_left_inds]))
             if len(good_right_inds) > minpix:
                 #rightx_current = int(np.mean(nonzerox[good_right_inds]))
                 self.right_kalmanFilter.update(leftx_current)
-                seged =int(self.right_kalmanFilter.get_position())
+                lkf =int(self.right_kalmanFilter.get_position())
 
-                if seged >0:
-                    rightx_current=seged
+                if lkf >0:
+                    rightx_current=lkf
                 else:
                     rightx_current =int(np.mean(nonzerox[good_left_inds]))
-
-
 
 
         # Concatenate the arrays of indices
@@ -255,30 +253,6 @@ class Lane:
         rightx = nonzerox[right_lane_inds]
         righty = nonzeroy[right_lane_inds]
 
-        #use the other correctly detected lane line
-        #if len(leftx)<200 and len(rightx)>100:
-        #    leftx = np.zeros_like(rightx)
-        #    kul = 1280-rightx
-        #    leftx+=kul-130
-        #    lefty=righty
-
-        #if len(rightx) < 200 and len(leftx) > 100:
-        #    rightx = np.zeros_like(leftx)
-        #    kul = 1280 - leftx
-        #    rightx += kul -100
-        #    righty = lefty
-
-
-
-        #difflx= np.diff(leftx)
-        #diffly = np.diff(lefty)
-
-        #diffrx =np.diff(rightx)
-        #diffry =np.diff(righty)
-
-        #leftx,lefty =self.checkPoints(leftx,lefty,difflx,diffly)
-        #rightx,righty =self.checkPoints(rightx,righty,diffrx,diffry)
-
         # Fit a second order polynomial to each
         left_fit =[]
         right_fit=[]
@@ -287,28 +261,18 @@ class Lane:
             left_fit = np.polyfit(lefty, leftx, 2)
             self.left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2]
 
-
         if len(rightx) > 0 or len(righty) > 0:
             right_fit = np.polyfit(righty, rightx, 2)
             self.right_fitx = right_fit[0] * ploty ** 2 + right_fit[1] * ploty + right_fit[2]
 
-        if len(left_fit)>0 and len(right_fit):
+        if len(left_fit)>0 and len(right_fit)>0:
             self.canDraw = True
             self.left_curverad,self.right_curverad,self.center_off = self.GetCurv(ploty,left_fit,right_fit)
-
+        else:
+            self.canDraw=False
         return left_fit, right_fit, out_img, left_lane_inds, right_lane_inds
 
-    def checkPoints(self,xkoords,ykoords,diffx,diffy):
 
-        for i in range(0,len(diffx)):
-            if diffx[i]>10:
-                np.delete(xkoords,i+1)
-                np.delete(ykoords,i+1)
-            if diffx[i]<-10:
-                np.delete(xkoords, i )
-                np.delete(ykoords, i )
-
-        return xkoords,ykoords
     def draw_lines(self,img_w,perspective,color):
         """ Draws the lane to the original image"""
         #img =self.image
@@ -323,17 +287,6 @@ class Lane:
             #diff2_r = np.gradient(np.gradient(self.right_fit, 1), 1)  # gets the second derevative to determine inflection point
 
             ploty = np.linspace(0, self.image.shape[0] - 1, self.image.shape[0])  # makes evenly spaced points of the lane points
-
-            diff_left = np.gradient(self.left_fitx, 1)
-            sdiff_left = np.gradient(np.gradient(diff_left, 1), 1)
-
-            diff_right = np.gradient(self.right_fitx, 1)
-            sdiff_right = np.gradient(np.gradient(diff_right, 1), 1)
-
-            infl_left = -1
-            infl_right = -1
-
-            positive = diff_left[0] > 0 and diff_right[0] > 0
 
             ploty = ploty[:600]
             self.left_fitx = self.left_fitx[:600]
@@ -364,28 +317,10 @@ class Lane:
             warp_zero = np.zeros_like(img_w).astype(np.uint8)
             color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
 
-            # Find the inflection point of the lane, so the polynom can be corrected
-
-            #diff2_l = np.gradient(np.gradient(left_fit, 1), 1)  # gets the second derevative to determine inflection point
-            #diff2_r = np.gradient(np.gradient(right_fit, 1), 1)  # gets the second derevative to determine inflection point
-
             ploty = np.linspace(0, self.image.shape[0] - 1, self.image.shape[0])  # makes evenly spaced points of the lane points
 
-
-            # ploty = np.linspace(0, img.shape[0] - 1, img.shape[0])  # makes evenly spaced points of the lane points
             left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2]  # left polynom
             right_fitx = right_fit[0] * ploty ** 2 + right_fit[1] * ploty + right_fit[2]  # right polynom
-
-            diff_left = np.gradient(left_fitx, 1)
-            #sdiff_left = np.gradient(np.gradient(diff_left, 1), 1)
-
-            diff_right = np.gradient(right_fitx, 1)
-            #sdiff_right = np.gradient(np.gradient(diff_right, 1), 1)
-
-            infl_left = -1
-            infl_right = -1
-
-            positive = diff_left[0] > 0 and diff_right[0] > 0
 
             ploty = ploty[:600]
             left_fitx = left_fitx[:600]
@@ -525,7 +460,8 @@ class Lane:
         if self.canDraw:
             if self.lane_width > 2.8 or self.lane_width < 2.0:
                 return False
-            #if self.right_curverad < 1000 and self.left_curverad < 1000 and self.right_curverad > 100 and self.left_curverad > 100:
+            if self.right_curverad < 500 or self.left_curverad < 500 or self.right_curverad > 15000 or self.left_curverad > 15000:
+                return  False
             if self.radius > 2 or self.radius < 0.2:
                 return False
             if self.center_off<0:

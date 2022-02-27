@@ -87,7 +87,8 @@ def Process_adv(image):
             laneHistory.SetRight_fit(prev_r)
 
         if len(laneHistory.GetLeft_fit()) >0 and len(laneHistory.GetRight_fit()):
-            result = laneProcess.draw_lines_fromHistory( warped, laneHistory.GetLeft_fit()[-1], laneHistory.GetRight_fit()[-1], perspective=[s_mask, dest_mask],color=(0, 255, 255))
+            avg_left_fitx, avg_right_fitx = get_avg_lane()
+            result = laneProcess.draw_lines_fromHistory( warped,  avg_left_fitx, avg_right_fitx, perspective=[s_mask, dest_mask],color=(0, 255, 0))
             laneHistory.incrementError()
             laneHistory.putHistoryDataOnScreen(result)
         else:
@@ -98,10 +99,29 @@ def Process_adv(image):
     laneProcess.canDraw=False
     return result
 
+def get_avg_lane():
+    """Gets the avarage of the detected lanes"""
+    if len(laneHistory.GetLeft_fit()) < 2:  # if the history size is less than 2 ,then returns the latest history
+        return laneHistory.GetLeft_fit()[-1], laneHistory.GetRight_fit()[-1]
+
+    left_avg = laneHistory.GetLeft_fit()[-1]
+    right_avg = laneHistory.GetRight_fit()[-1]
+    n_lanes = len(laneHistory.GetLeft_fit())
+
+    for i in range(1, n_lanes):
+        left_avg = np.add(left_avg, laneHistory.GetLeft_fit()[i])
+        right_avg = np.add(right_avg, laneHistory.GetRight_fit()[i])
+
+    avg_left_fitx = left_avg / n_lanes
+    avg_right_fitx = right_avg / n_lanes
+
+    return avg_left_fitx, avg_right_fitx
+
 while capture.isOpened():
     ret, frame = capture.read()
     # if frame is read correctly ret is True
     frame =cv.resize(frame,(1280,720))
+    frame =SignDetector.DetectSign(frame)
     frame = Process_adv(frame)
     #vmi = frame.shape[0]
     #vmi3 = frame.shape[1]

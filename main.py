@@ -1,18 +1,20 @@
+
 import cv2 as cv
 from timeit import default_timer as timer
 from Lane import Lane
 from Lane import LaneHistory
 from Perspective_transform import Perspective
 from Threshold import ImgThreshold
-
+from TrafficSign_recognition import TrafficSignDetector
+import numpy as np
 
 perspective =Perspective()
 laneHistory =LaneHistory()
 laneProcess = Lane(perspective)
 Thresholder =ImgThreshold()
-
+SignDetector = TrafficSignDetector()
 GoodLane = True
-capture = cv.VideoCapture('higwaytest.mp4')
+capture = cv.VideoCapture('ts_test.mp4')
 # FPS counter
 counter = 0
 fps_start = timer()
@@ -36,7 +38,7 @@ def Process_adv(image):
     #return roi_image
     #Perspective transform
     warped = perspective.perspective_transform(roi_image, s_mask, dest_mask)
-    #return blurred
+
     #return warped
 
     blurred = cv.medianBlur(warped,3)
@@ -58,7 +60,7 @@ def Process_adv(image):
     drawn_hotspots = laneProcess.draw_lines_hotspots(warped, left_lane_inds, right_lane_inds)
     #cv.imshow('c', drawn_hotspots)
     #return drawn_hotspots
-    if laneProcess.sanity_check() or firstLane:
+    if laneProcess.sanity_check() :#or firstLane:
         result = laneProcess.draw_lines(warped, perspective=[s_mask, dest_mask], color=(0, 255, 0))
         GoodLane = True
         laneHistory.SetLeft_fit(left_fit)  # good lanes are added to the history
@@ -68,27 +70,28 @@ def Process_adv(image):
         laneHistory.SetOffset(laneProcess.GetCenterOff())
         laneHistory.setWidth(laneProcess.getWidth())
         laneHistory.setRadius(laneProcess.getRadius())
-
+        laneHistory.setPloty(laneProcess.getPloty())
         laneProcess.putDatasOnScreen(result)
-        firstLane=False
+        #firstLane=False
 
     else:
         GoodLane = False
+
         if laneHistory.getError()>60:
             laneHistory.setError(0)
-            firstLane=True
+            #firstLane=True
             prev_l =laneHistory.GetLeft_fit()[-1]
             prev_r =laneHistory.GetRight_fit()[-1]
-
+            laneProcess.canDraw = False
             laneHistory.GetLeft_fit().clear()
             laneHistory.GetRight_fit().clear()
 
             laneHistory.SetLeft_fit(prev_l)
             laneHistory.SetRight_fit(prev_r)
 
-        if len(laneHistory.GetLeft_fit()) >0 and len(laneHistory.GetRight_fit()):
+        if len(laneHistory.GetLeft_fit()) >0 and len(laneHistory.GetRight_fit())>0:
             avg_left_fitx, avg_right_fitx = get_avg_lane()
-            result = laneProcess.draw_lines_fromHistory( warped,  avg_left_fitx, avg_right_fitx, perspective=[s_mask, dest_mask],color=(0, 255, 0))
+            result = laneProcess.draw_lines_fromHistory( warped,  avg_left_fitx, avg_right_fitx,laneHistory.ploty, perspective=[s_mask, dest_mask],color=(0, 255, 255))
             laneHistory.incrementError()
             laneHistory.putHistoryDataOnScreen(result)
         else:
@@ -121,10 +124,9 @@ while capture.isOpened():
     ret, frame = capture.read()
     # if frame is read correctly ret is True
     frame =cv.resize(frame,(1280,720))
-    frame =SignDetector.DetectSign(frame)
+
+    #frame =SignDetector.DetectSign(frame)
     frame = Process_adv(frame)
-    #vmi = frame.shape[0]
-    #vmi3 = frame.shape[1]
     cv.imshow('frame', frame)
     #print("frame:"+str(fdb))
     #fdb+=1

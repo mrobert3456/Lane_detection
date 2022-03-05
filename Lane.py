@@ -103,7 +103,7 @@ class Lane:
         self.ym_per_pix = 30 / 720  # meters per pixel in y dimension
         self.xm_per_pix = 3.7 / 640  # meters per pixel in x dimension
         self.perspectiveT=persp_t
-        self.filter = WindowFilter(pos_init=1280 / 4)
+        #self.filter = WindowFilter(pos_init=1280 / 4)
         self.prev_Left_Windows=[]
         self.prev_Right_Windows=[]
         self.dropout_Count=0
@@ -111,11 +111,11 @@ class Lane:
         self.rightDiff=0
 
         self.canDraw=False
-        self.left_kalmanFilter = WindowFilter()
-        self.right_kalmanFilter = WindowFilter()
+        self.left_kalmanFilter = WindowFilter(pos_init=1280 / 4)
+        self.right_kalmanFilter = WindowFilter(pos_init=1280-(1280 / 4))
 
         self.y_end = 360
-        self.ploty=720
+        self.ploty=600
 
 
     def SetImg(self,img):
@@ -182,13 +182,19 @@ class Lane:
         leftx_current = leftx_base
         rightx_current = rightx_base
 
+        # if the base points of both lane lines are not found, then make an approximation
         if leftx_current==0:
             leftx_current = midpoint-250
+        if rightx_current ==0:
+            rightx_current = midpoint+250
 
-        self.prev_Left_Windows.append(leftx_current)
+
+        #self.prev_Left_Windows.append(leftx_current)
         self.left_kalmanFilter.set_init_poz(leftx_base)
         self.right_kalmanFilter.set_init_poz(rightx_base)
-        min_lanepoint_goodness = -40
+
+        right_end = self.image.shape[0]
+        left_end = self.image.shape[0]
 
         # Set the width of the windows +/- margin
         margin = marginsize
@@ -200,7 +206,6 @@ class Lane:
         left_lane_inds = []
         right_lane_inds = []
         color = (0, 255, 0)  # green
-        db=0
         # Step through the windows one by one
         for window in range(self.window_count):
             # Identify window boundaries in x and y (and right and left)
@@ -233,23 +238,19 @@ class Lane:
             # If you found > minpix pixels, recenter next window on their mean position
 
             if len(good_left_inds) > minpix:
-                #leftx_current = int(np.mean(nonzerox[good_left_inds]))
                 self.left_kalmanFilter.update(rightx_current)
                 rkf =int(self.left_kalmanFilter.get_position())
                 if rkf >0:
                     leftx_current=rkf
-                    self.y_end =win_y_high
-                #else:
-                 #  leftx_current =int(np.mean(nonzerox[good_left_inds]))
+                    left_end =win_y_high
+
             if len(good_right_inds) > minpix:
-                #rightx_current = int(np.mean(nonzerox[good_right_inds]))
                 self.right_kalmanFilter.update(leftx_current)
                 lkf =int(self.right_kalmanFilter.get_position())
-
                 if lkf >0:
                     rightx_current=lkf
-                #else:
-                 #   rightx_current =int(np.mean(nonzerox[good_left_inds]))
+                    right_end=win_y_high
+
 
 
         # Concatenate the arrays of indices
@@ -266,16 +267,22 @@ class Lane:
         left_fit =[]
         right_fit=[]
         ploty = np.linspace(0, 600,self.image.shape[0])  # makes evenly spaced points of the lane points
+        if left_end<right_end:
+            self.y_end=left_end
+        else:
+            self.y_end=right_end
         self.ploty =ploty[self.y_end:]
-        if len(leftx)>0 or len(lefty)>0 :
+
+
+        if len(leftx)>0 and len(lefty)>0 :
             left_fit = np.polyfit(lefty, leftx, 2)
             self.left_fitx = left_fit[0] * self.ploty ** 2 + left_fit[1] * self.ploty + left_fit[2]
 
-        if len(rightx) > 0 or len(righty) > 0:
+        if len(rightx) > 0 and len(righty) > 0:
             right_fit = np.polyfit(righty, rightx, 2)
             self.right_fitx = right_fit[0] * self.ploty ** 2 + right_fit[1] * self.ploty + right_fit[2]
 
-        if len(left_fit)>0 and len(right_fit)>0:
+        if len(left_fit)>0 and len(right_fit)>0 and len(self.ploty)>200:
             self.canDraw = True
             self.left_curverad,self.right_curverad,self.center_off = self.GetCurv(self.ploty,left_fit,right_fit)
         else:
@@ -290,21 +297,6 @@ class Lane:
         if self.canDraw:
             warp_zero = np.zeros_like(img_w).astype(np.uint8)
             color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
-
-            # Find the inflection point of the lane, so the polynom can be corrected
-
-            #diff2_l = np.gradient(np.gradient(self.left_fit, 1), 1)  # gets the second derevative to determine inflection point
-            #diff2_r = np.gradient(np.gradient(self.right_fit, 1), 1)  # gets the second derevative to determine inflection point
-
-            #ploty = np.linspace(0, self.image.shape[0] - 1, self.image.shape[0])  # makes evenly spaced points of the lane points
-
-           # self.ploty = self.ploty[:600]
-            #self.left_fitx = self.left_fitx[:600]
-            #self.right_fitx = self.right_fitx[:600]
-
-            #self.left_fitx = self.left_fitx[self.y_end:]
-            #self.right_fitx = self.right_fitx[self.y_end:]
-
             # Recast the x and y points into usable format for cv.fillPoly()
 
             pts_left = np.array([np.transpose(np.vstack([self.left_fitx, self.ploty]))])
@@ -331,16 +323,8 @@ class Lane:
             warp_zero = np.zeros_like(img_w).astype(np.uint8)
             color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
 
-           # ploty = np.linspace(0, self.image.shape[0] - 1, self.image.shape[0])  # makes evenly spaced points of the lane points
-
             left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2]  # left polynom
             right_fitx = right_fit[0] * ploty ** 2 + right_fit[1] * ploty + right_fit[2]  # right polynom
-
-            #ploty = ploty[self.y_end:]
-            #ploty = ploty[:600]
-            #left_fitx = left_fitx[:600]
-            #right_fitx = right_fitx[:600]
-
 
             # Recast the x and y points into usable format for cv.fillPoly()
             pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
@@ -474,7 +458,7 @@ class Lane:
         """Decides whether the detected lane is valid or not"""
         #return True
         if self.canDraw:
-            if self.lane_width > 2.8 or self.lane_width < 2.0:
+            if self.lane_width > 3.2 or self.lane_width < 2.0:
                 return False
             if self.right_curverad < 500 or self.left_curverad < 500 or self.right_curverad > 15000 or self.left_curverad > 15000:
                 return  False
@@ -520,7 +504,7 @@ class Lane:
 
 
 class WindowFilter:
-    def __init__(self, pos_init=0.0, meas_variance=30, process_variance=0.1, uncertainty_init=2 ** 30):
+    def __init__(self, pos_init=0.0, meas_variance=50, process_variance=0.1, uncertainty_init=2 ** 10):
         """
         A one dimensional Kalman filter tuned to track the position of a window.
         State variable:   = [position,

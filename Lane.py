@@ -75,6 +75,32 @@ class LaneHistory:
         return
 
     def putHistoryDataOnScreen(self, img):
+        # Show position
+
+        lane_position_prcnt = self.GetCenterOff() / self.lane_width
+
+        x_text_start, y_text_start = (10, 450)
+        line_start = (10 + x_text_start, 40 + y_text_start)
+        line_len = 300
+        cv.putText(img, "Position", org=(x_text_start, y_text_start), fontScale=2, thickness=3,
+                   fontFace=cv.FONT_HERSHEY_SIMPLEX, lineType=cv.LINE_AA, color=(255, 255, 255))
+        cv.line(img, color=(255, 255, 255), thickness=2,
+                pt1=(line_start[0], line_start[1]),
+                pt2=(line_start[0] + line_len, line_start[1]))
+        cv.circle(img, center=(line_start[0] + int(lane_position_prcnt * line_len), line_start[1]),
+                  radius=8,
+                  color=(255, 255, 255))
+
+
+        cv.putText(img, '{:.2f} m'.format(self.center_off[-1]), fontScale=1, thickness=1,
+                org=(line_start[0] + int(lane_position_prcnt * line_len) + 5, line_start[1] + 35),
+                fontFace=cv.FONT_HERSHEY_SIMPLEX, color=(255, 255, 255), lineType=cv.LINE_AA)
+
+        center = int(img.shape[1] / 2)
+        cv.circle(img, center=(center,center+5),
+                  radius=8,
+                  color=(255, 255, 255))
+
         # print to image
         text = "radius = %s [m]\noffcenter = %s [m]\nwidth = %s [m]\nLeft_curve = %s\nRight_curve = %s" % (
             str(self.radius), str(self.center_off[-1]), str(self.lane_width), str(self.left_curverad[-1]),
@@ -101,7 +127,7 @@ class Lane:
         self.left_fitx=None
         self.right_fitx=None
         self.ym_per_pix = 30 / 720  # meters per pixel in y dimension
-        self.xm_per_pix = 3.7 / 640  # meters per pixel in x dimension
+        self.xm_per_pix = 4.7 / 640  # meters per pixel in x dimension
         self.perspectiveT=persp_t
         #self.filter = WindowFilter(pos_init=1280 / 4)
         self.prev_Left_Windows=[]
@@ -147,7 +173,31 @@ class Lane:
 
     def putDatasOnScreen(self, img):
 
+        # Show position
+        lane_position_prcnt = self.center_off / self.lane_width
+
+        x_text_start, y_text_start = (10, 450)
+        line_start = (10 + x_text_start, 40 + y_text_start)
+        line_len = 300
+        cv.putText(img, "Position", org=(x_text_start, y_text_start), fontScale=2, thickness=3,
+                    fontFace=cv.FONT_HERSHEY_SIMPLEX, lineType=cv.LINE_AA, color=(255, 255, 255))
+        cv.line(img, color=(255, 255, 255), thickness=2,
+                 pt1=(line_start[0], line_start[1]),
+                 pt2=(line_start[0] + line_len, line_start[1]))
+        cv.circle(img, center=(line_start[0] + int(lane_position_prcnt * line_len), line_start[1]),
+                   radius=8,
+                   color=(255, 255, 255))
+        cv.putText(img, '{:.2f} m'.format(self.center_off), fontScale=1, thickness=1,
+                    org=(line_start[0] + int(lane_position_prcnt * line_len) + 5, line_start[1] + 35),
+                    fontFace=cv.FONT_HERSHEY_SIMPLEX, color=(255, 255, 255), lineType=cv.LINE_AA)
+
         # print to image
+
+        center=int(self.image.shape[1]/2)
+        cv.circle(img, center=(center,center+5),
+                  radius=8,
+                  color=(255, 255, 255))
+
         text = "radius = %s [m]\noffcenter = %s [m]\nwidth = %s [m]\nLeft_curve = %s\nRight_curve = %s" % (
             str(self.radius), str(self.center_off), str(self.lane_width), str(self.left_curverad), str(self.right_curverad))
         for i, line in enumerate(text.split('\n')):
@@ -340,7 +390,6 @@ class Lane:
 
             # Combine the result with the original image
             result = cv.addWeighted(self.image, 1, newwarp, 0.2, 0)
-
             return result
         return self.image
     def GetCurv(self,ploty, left_fit, right_fit):
@@ -361,17 +410,16 @@ class Lane:
 
         center = (right_fit[2] - left_fit[2]) / 2
 
-        #left_off = (center - left_fit[2]) * self.xm_per_pix
-        #right_off = (right_fit[2] - center) * self.xm_per_pix
-
         self.radius = right_curverad / left_curverad
 
-        # lane_width = (right_fit[2] - left_fit[2]) * xm_per_pix
         self.lane_width = np.mean((self.right_fitx - self.left_fitx) * self.xm_per_pix)
 
         center_off = round(center - self.image.shape[0] / 2. * self.xm_per_pix, 2)
 
-        return right_curverad, left_curverad, center_off
+        img_center = self.image.shape[1]/2
+        lane_position_prcnt = np.interp(img_center, [self.left_fitx[-1], self.right_fitx[-1]], [0, 1])
+        lane_position = lane_position_prcnt * self.lane_width
+        return right_curverad, left_curverad, lane_position
 
     def draw_lane_lines_regions(self,warped_img):
         """
@@ -458,14 +506,14 @@ class Lane:
         """Decides whether the detected lane is valid or not"""
         #return True
         if self.canDraw:
-            if self.lane_width > 3.2 or self.lane_width < 2.0:
+            if self.lane_width > 3.8 or self.lane_width < 2.6:
                 return False
             if self.right_curverad < 500 or self.left_curverad < 500 or self.right_curverad > 15000 or self.left_curverad > 15000:
                 return  False
             if self.radius > 2 or self.radius < 0.2:
                 return False
-            if self.center_off<0:
-                return  False
+            #if self.center_off<0:
+            #    return  False
             return True
         else:
             return False

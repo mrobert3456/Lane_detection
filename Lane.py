@@ -290,19 +290,25 @@ class Lane:
             if len(good_left_inds) > minpix:
                 self.left_kalmanFilter.update(rightx_current)
                 rkf =int(self.left_kalmanFilter.get_position())
-                if rkf >0:
+                maxl = int(np.mean(nonzerox[good_left_inds]))
+                #avgl = int((rkf+maxl)/2)
+                if rkf >300 and rkf < midpoint:
                     leftx_current=rkf
                     left_end =win_y_high
-
+                else:
+                    leftx_current = maxl
+                    left_end = win_y_high
             if len(good_right_inds) > minpix:
                 self.right_kalmanFilter.update(leftx_current)
                 lkf =int(self.right_kalmanFilter.get_position())
-                if lkf >0:
+                maxr= int(np.mean(nonzerox[good_right_inds]))
+                #maxr = int((lkf + maxr) / 2)
+                if lkf >midpoint and lkf<860:
                     rightx_current=lkf
                     right_end=win_y_high
-
-
-
+                else:
+                    rightx_current = maxr
+                    right_end = win_y_high
         # Concatenate the arrays of indices
         left_lane_inds = np.concatenate(left_lane_inds)
         right_lane_inds = np.concatenate(right_lane_inds)
@@ -506,16 +512,20 @@ class Lane:
         """Decides whether the detected lane is valid or not"""
         #return True
         if self.canDraw:
-            if self.lane_width > 3.8 or self.lane_width < 2.6:
+            if self.lane_width > 3.3 or self.lane_width < 2.4:
+                print("LANE WIDTH FAIL: " +str(self.lane_width))
                 return False
-            if self.right_curverad < 500 or self.left_curverad < 500 or self.right_curverad > 15000 or self.left_curverad > 15000:
+            if self.right_curverad < 300 or self.left_curverad < 300 or self.right_curverad > 15000 or self.left_curverad > 15000:
+                print("CURVARAD FAIL")
                 return  False
             if self.radius > 2 or self.radius < 0.2:
+                print("RADIUS FAIL")
                 return False
             #if self.center_off<0:
             #    return  False
             return True
         else:
+            print("CANT DRAW")
             return False
 
     def region_of_interest(self, img):

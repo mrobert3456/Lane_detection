@@ -14,7 +14,7 @@ laneProcess = Lane(perspective)
 Thresholder =ImgThreshold()
 SignDetector = TrafficSignDetector()
 GoodLane = True
-capture = cv.VideoCapture('ts_test.mp4')
+capture = cv.VideoCapture('higwaytest.mp4')
 # FPS counter
 counter = 0
 fps_start = timer()
@@ -47,6 +47,7 @@ def Process_adv(image):
     global  firstLane
 
     #if the lane is good then the marginsize =50, else marginsize=100
+
     if GoodLane:
         left_fit, right_fit, outimg,left_lane_inds, right_lane_inds = laneProcess.sliding_windown(warped,marginsize=25)  # returns the right and the left lane lines points
     else:
@@ -60,26 +61,28 @@ def Process_adv(image):
     drawn_hotspots = laneProcess.draw_lines_hotspots(warped, left_lane_inds, right_lane_inds)
     #cv.imshow('c', drawn_hotspots)
     #return drawn_hotspots
-    if laneProcess.sanity_check() :#or firstLane:
+    validLane = laneProcess.sanity_check()
+    if  validLane or firstLane:
         result = laneProcess.draw_lines(warped, perspective=[s_mask, dest_mask], color=(0, 255, 0))
-        GoodLane = True
-        laneHistory.SetLeft_fit(left_fit)  # good lanes are added to the history
-        laneHistory.SetRight_fit(right_fit)
-        laneHistory.SetLeftCurvature(laneProcess.GetLeft_Curve())
-        laneHistory.SetRightCurvature(laneProcess.GetRight_Curve())
-        laneHistory.SetOffset(laneProcess.GetCenterOff())
-        laneHistory.setWidth(laneProcess.getWidth())
-        laneHistory.setRadius(laneProcess.getRadius())
-        laneHistory.setPloty(laneProcess.getPloty())
-        laneProcess.putDatasOnScreen(result)
-        #firstLane=False
+        if validLane:
+            GoodLane = True
+            laneHistory.SetLeft_fit(left_fit)  # good lanes are added to the history
+            laneHistory.SetRight_fit(right_fit)
+            laneHistory.SetLeftCurvature(laneProcess.GetLeft_Curve())
+            laneHistory.SetRightCurvature(laneProcess.GetRight_Curve())
+            laneHistory.SetOffset(laneProcess.GetCenterOff())
+            laneHistory.setWidth(laneProcess.getWidth())
+            laneHistory.setRadius(laneProcess.getRadius())
+            laneHistory.setPloty(laneProcess.getPloty())
+            laneProcess.putDatasOnScreen(result)
+        firstLane=False
 
     else:
         GoodLane = False
 
         if laneHistory.getError()>60:
             laneHistory.setError(0)
-            #firstLane=True
+            firstLane=True
             prev_l =laneHistory.GetLeft_fit()[-1]
             prev_r =laneHistory.GetRight_fit()[-1]
             laneProcess.canDraw = False
@@ -90,8 +93,8 @@ def Process_adv(image):
             laneHistory.SetRight_fit(prev_r)
 
         if len(laneHistory.GetLeft_fit()) >0 and len(laneHistory.GetRight_fit())>0:
-            avg_left_fitx, avg_right_fitx = get_avg_lane()
-            result = laneProcess.draw_lines_fromHistory( warped,  avg_left_fitx, avg_right_fitx,laneHistory.ploty, perspective=[s_mask, dest_mask],color=(0, 255, 255))
+            #avg_left_fitx, avg_right_fitx = get_avg_lane()
+            result = laneProcess.draw_lines_fromHistory( warped,  laneHistory.GetLeft_fit()[-1], laneHistory.GetRight_fit()[-1],laneHistory.ploty, perspective=[s_mask, dest_mask],color=(0, 255, 255))
             laneHistory.incrementError()
             laneHistory.putHistoryDataOnScreen(result)
         else:
@@ -111,7 +114,7 @@ def get_avg_lane():
     right_avg = laneHistory.GetRight_fit()[-1]
     n_lanes = len(laneHistory.GetLeft_fit())
 
-    for i in range(1, n_lanes):
+    for i in range(0, n_lanes):
         left_avg = np.add(left_avg, laneHistory.GetLeft_fit()[i])
         right_avg = np.add(right_avg, laneHistory.GetRight_fit()[i])
 
@@ -120,18 +123,21 @@ def get_avg_lane():
 
     return avg_left_fitx, avg_right_fitx
 
+
 while capture.isOpened():
-    ret, frame = capture.read()
+    ret, frame1 = capture.read()
+    ret2, frame = capture.read()
     # if frame is read correctly ret is True
     frame =cv.resize(frame,(1280,720))
-
     #frame =SignDetector.DetectSign(frame)
     frame = Process_adv(frame)
+
     cv.imshow('frame', frame)
+
     #print("frame:"+str(fdb))
     #fdb+=1
 
-    counter += 1
+    counter += 2
 
     # Stopping timer for FPS
     # Getting current time point in seconds

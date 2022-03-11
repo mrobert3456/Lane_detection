@@ -205,12 +205,74 @@ class Lane:
             cv.putText(img, line, (0, 200 + i), cv.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255), 1, cv.LINE_AA)
         return
 
+    def fitPoly(self,left_lane_inds,right_lane_inds,left_end,right_end,nonzerox,nonzeroy):
+
+        # Extract left and right line pixel positions
+        leftx = nonzerox[left_lane_inds]
+        lefty = nonzeroy[left_lane_inds]
+        rightx = nonzerox[right_lane_inds]
+        righty = nonzeroy[right_lane_inds]
+
+        left_fit = []
+        right_fit = []
+        ploty = np.linspace(0, 600, self.image.shape[0])  # makes evenly spaced points of the lane points
+        if left_end < right_end:
+            self.y_end = left_end
+        else:
+            self.y_end = right_end
+        self.ploty = ploty[self.y_end:]
+
+        if len(leftx) > 0 and len(lefty) > 0:
+            left_fit = np.polyfit(lefty, leftx, 2)
+            self.left_fitx = left_fit[0] * self.ploty ** 2 + left_fit[1] * self.ploty + left_fit[2]
+
+        if len(rightx) > 0 and len(righty) > 0:
+            right_fit = np.polyfit(righty, rightx, 2)
+            self.right_fitx = right_fit[0] * self.ploty ** 2 + right_fit[1] * self.ploty + right_fit[2]
+
+        if len(left_fit) > 0 and len(right_fit) > 0 and len(self.ploty) > 200:
+            self.canDraw = True
+            self.left_curverad, self.right_curverad, self.center_off = self.GetCurv(self.ploty, left_fit, right_fit)
+        else:
+            self.canDraw = False
+        return left_fit,right_fit
+
+    def validateWindow(self,nonzerox,good_left_inds,good_right_inds,rightx_current,leftx_current,win_y_high,midpoint):
+        # Set minimum number of pixels found to recenter window
+        minpix = 50
+        left_end=self.y_end
+        right_end=self.y_end
+        if len(good_left_inds) > minpix:
+            self.left_kalmanFilter.update(rightx_current)
+            rkf = int(self.left_kalmanFilter.get_position())
+            maxl = int(np.mean(nonzerox[good_left_inds]))
+
+            if rkf > 300 and rkf < midpoint:
+                leftx_current = rkf
+                left_end = win_y_high
+            else:
+                avgl = int((rkf + maxl) / 2)
+                leftx_current = avgl
+                left_end = win_y_high
+        if len(good_right_inds) > minpix:
+            self.right_kalmanFilter.update(leftx_current)
+            lkf = int(self.right_kalmanFilter.get_position())
+            maxr = int(np.mean(nonzerox[good_right_inds]))
+
+            if lkf > midpoint and lkf < 860:
+                rightx_current = lkf
+                right_end = win_y_high
+            else:
+                avgr = int((lkf + maxr) / 2)
+                rightx_current = avgr
+                right_end = win_y_high
+        return  rightx_current,leftx_current,left_end,right_end
 
     def sliding_windown(self,img_w,marginsize):
         """Returns the left and the right lane line points"""
         histogram = np.sum(img_w[int(img_w.shape[0] / 2):, :], axis=0)
         # histogram = parallel.HistogramGPU(img_w) # gets the histogram of the image
-        self.y_end=360
+        self.y_end=500
         # Creates an output image to draw on and visualize the result
         out_img = np.dstack((img_w, img_w, img_w)) * 255
 
@@ -240,17 +302,14 @@ class Lane:
 
 
         #self.prev_Left_Windows.append(leftx_current)
-        self.left_kalmanFilter.set_init_poz(leftx_base)
-        self.right_kalmanFilter.set_init_poz(rightx_base)
+        self.left_kalmanFilter.set_init_poz(leftx_current)
+        self.right_kalmanFilter.set_init_poz(rightx_current)
 
         right_end = self.image.shape[0]
         left_end = self.image.shape[0]
 
         # Set the width of the windows +/- margin
         margin = marginsize
-
-        # Set minimum number of pixels found to recenter window
-        minpix = 50
 
         # Create empty lists to receive left and right lane pixel indices
         left_lane_inds = []
@@ -267,10 +326,7 @@ class Lane:
             win_xright_low = rightx_current - margin
             win_xright_high = rightx_current + margin
 
-            # indentify whether the left and the right windows are intersected
-
             # Draw the windows on the visualization image
-
             recone = cv.rectangle(out_img, (win_xleft_low, win_y_low), (win_xleft_high, win_y_high), color, 2)
             rectwo = cv.rectangle(out_img, (win_xright_low, win_y_low), (win_xright_high, win_y_high), color, 2)
 
@@ -281,68 +337,22 @@ class Lane:
             good_right_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) & (nonzerox >= win_xright_low) & (
                     nonzerox < win_xright_high)).nonzero()[0]
 
+            #determine the position of the next window
+            rightx_current,leftx_current,left_end,right_end = self.validateWindow(nonzerox,good_left_inds,good_right_inds,rightx_current,leftx_current,win_y_high,midpoint)
+
             # Append these indices to the lists
             left_lane_inds.append(good_left_inds)
             right_lane_inds.append(good_right_inds)
 
-            # If you found > minpix pixels, recenter next window on their mean position
 
-            if len(good_left_inds) > minpix:
-                self.left_kalmanFilter.update(rightx_current)
-                rkf =int(self.left_kalmanFilter.get_position())
-                maxl = int(np.mean(nonzerox[good_left_inds]))
-                #avgl = int((rkf+maxl)/2)
-                if rkf >300 and rkf < midpoint:
-                    leftx_current=rkf
-                    left_end =win_y_high
-                else:
-                    leftx_current = maxl
-                    left_end = win_y_high
-            if len(good_right_inds) > minpix:
-                self.right_kalmanFilter.update(leftx_current)
-                lkf =int(self.right_kalmanFilter.get_position())
-                maxr= int(np.mean(nonzerox[good_right_inds]))
-                #maxr = int((lkf + maxr) / 2)
-                if lkf >midpoint and lkf<860:
-                    rightx_current=lkf
-                    right_end=win_y_high
-                else:
-                    rightx_current = maxr
-                    right_end = win_y_high
         # Concatenate the arrays of indices
         left_lane_inds = np.concatenate(left_lane_inds)
         right_lane_inds = np.concatenate(right_lane_inds)
 
-        # Extract left and right line pixel positions
-        leftx = nonzerox[left_lane_inds]
-        lefty = nonzeroy[left_lane_inds]
-        rightx = nonzerox[right_lane_inds]
-        righty = nonzeroy[right_lane_inds]
 
         # Fit a second order polynomial to each
-        left_fit =[]
-        right_fit=[]
-        ploty = np.linspace(0, 600,self.image.shape[0])  # makes evenly spaced points of the lane points
-        if left_end<right_end:
-            self.y_end=left_end
-        else:
-            self.y_end=right_end
-        self.ploty =ploty[self.y_end:]
+        left_fit, right_fit = self.fitPoly(left_lane_inds,right_lane_inds,left_end,right_end,nonzerox,nonzeroy)
 
-
-        if len(leftx)>0 and len(lefty)>0 :
-            left_fit = np.polyfit(lefty, leftx, 2)
-            self.left_fitx = left_fit[0] * self.ploty ** 2 + left_fit[1] * self.ploty + left_fit[2]
-
-        if len(rightx) > 0 and len(righty) > 0:
-            right_fit = np.polyfit(righty, rightx, 2)
-            self.right_fitx = right_fit[0] * self.ploty ** 2 + right_fit[1] * self.ploty + right_fit[2]
-
-        if len(left_fit)>0 and len(right_fit)>0 and len(self.ploty)>200:
-            self.canDraw = True
-            self.left_curverad,self.right_curverad,self.center_off = self.GetCurv(self.ploty,left_fit,right_fit)
-        else:
-            self.canDraw=False
         return left_fit, right_fit, out_img, left_lane_inds, right_lane_inds
 
 
@@ -511,15 +521,17 @@ class Lane:
     def sanity_check(self):
         """Decides whether the detected lane is valid or not"""
         #return True
+        print("---------------------------------------------------")
         if self.canDraw:
             if self.lane_width > 3.3 or self.lane_width < 2.4:
                 print("LANE WIDTH FAIL: " +str(self.lane_width))
                 return False
             if self.right_curverad < 300 or self.left_curverad < 300 or self.right_curverad > 15000 or self.left_curverad > 15000:
-                print("CURVARAD FAIL")
+                print("RIGHT CURVARAD FAIL: "+ str(self.right_curverad))
+                print("LEFT CURVARAD FAIL: " + str(self.left_curverad))
                 return  False
-            if self.radius > 2 or self.radius < 0.2:
-                print("RADIUS FAIL")
+            if self.radius > 4 or self.radius < 0.2:
+                print("RADIUS FAIL: "  +str(self.radius))
                 return False
             #if self.center_off<0:
             #    return  False

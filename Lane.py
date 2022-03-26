@@ -117,8 +117,6 @@ class Lane:
         self.small_img_size = (256, 144)
         self.small_img_x_offset = 20
         self.small_img_y_offset = 10
-        #self.imgWidth=binImg.shape[1]
-        #self.imgHeight=binImg.shape[0]
         self.left_curverad = None
         self.right_curverad = None
         self.center_off=None
@@ -129,12 +127,6 @@ class Lane:
         self.ym_per_pix = 30 / 720  # meters per pixel in y dimension
         self.xm_per_pix = 4.7 / 640  # meters per pixel in x dimension
         self.perspectiveT=persp_t
-        #self.filter = WindowFilter(pos_init=1280 / 4)
-        self.prev_Left_Windows=[]
-        self.prev_Right_Windows=[]
-        self.dropout_Count=0
-        self.leftDiff=0
-        self.rightDiff=0
 
         self.canDraw=False
         self.left_kalmanFilter = WindowFilter(pos_init=1280 / 4)
@@ -239,33 +231,36 @@ class Lane:
 
     def validateWindow(self,nonzerox,good_left_inds,good_right_inds,rightx_current,leftx_current,win_y_high,midpoint):
         # Set minimum number of pixels found to recenter window
-        minpix = 50
-        left_end=self.y_end
-        right_end=self.y_end
+        minpix = 100
+        left_end=100
+        right_end=100
         if len(good_left_inds) > minpix:
-            self.left_kalmanFilter.update(rightx_current)
-            rkf = int(self.left_kalmanFilter.get_position())
             maxl = int(np.mean(nonzerox[good_left_inds]))
+            self.left_kalmanFilter.update(rightx_current)
+            lkf = int(self.left_kalmanFilter.get_position())
 
-            if rkf > 300 and rkf < midpoint:
-                leftx_current = rkf
-                left_end = win_y_high
+            if lkf > 300 and lkf < midpoint:
+                leftx_current = lkf-25
+                #left_end = win_y_high
             else:
-                avgl = int((rkf + maxl) / 2)
+                avgl = int((lkf + 1.1*maxl) / 2)
                 leftx_current = avgl
-                left_end = win_y_high
+                #left_end = win_y_high
+            left_end = win_y_high
         if len(good_right_inds) > minpix:
-            self.right_kalmanFilter.update(leftx_current)
-            lkf = int(self.right_kalmanFilter.get_position())
             maxr = int(np.mean(nonzerox[good_right_inds]))
+            self.right_kalmanFilter.update(leftx_current)
+            rkf = int(self.right_kalmanFilter.get_position())
 
-            if lkf > midpoint and lkf < 860:
-                rightx_current = lkf
-                right_end = win_y_high
+
+            if rkf > midpoint and rkf < 860:
+                rightx_current = rkf+25
+                #right_end = win_y_high
             else:
-                avgr = int((lkf + maxr) / 2)
+                avgr = int((rkf + 1.1*maxr) / 2)
                 rightx_current = avgr
-                right_end = win_y_high
+                #right_end = win_y_high
+            right_end = win_y_high
         return  rightx_current,leftx_current,left_end,right_end
 
     def sliding_windown(self,img_w,marginsize):
@@ -274,8 +269,9 @@ class Lane:
         # histogram = parallel.HistogramGPU(img_w) # gets the histogram of the image
         self.y_end=500
         # Creates an output image to draw on and visualize the result
-        out_img = np.dstack((img_w, img_w, img_w)) * 255
-
+        out_img = np.dstack((img_w, img_w, img_w)) # *255
+        imgsgs = img_w.shape
+        vmi = out_img.shape
         # Find the peak of the left and right halves of the histogram
         # These will be the starting point for the left and right lines
         midpoint = int(histogram.shape[0] / 2)
@@ -417,20 +413,17 @@ class Lane:
         right_fit_cr = np.polyfit(ploty * self.ym_per_pix, self.right_fitx * self.xm_per_pix, 2)
 
         # Calculate the new radii of curvature
-        left_curverad = ((1 + (2 * left_fit_cr[0] * y_eval * self.ym_per_pix + left_fit_cr[1]) ** 2) ** 1.5) / np.absolute(
-            2 * left_fit_cr[0])
+        left_curverad = ((1 + (2 * left_fit_cr[0] * y_eval * self.ym_per_pix + left_fit_cr[1]) ** 2) ** 1.5) / np.absolute(2 * left_fit_cr[0])
 
-        right_curverad = ((1 + (
-                    2 * right_fit_cr[0] * y_eval * self.ym_per_pix + right_fit_cr[1]) ** 2) ** 1.5) / np.absolute(
-            2 * right_fit_cr[0])
+        right_curverad = ((1 + (2 * right_fit_cr[0] * y_eval * self.ym_per_pix + right_fit_cr[1]) ** 2) ** 1.5) / np.absolute(2 * right_fit_cr[0])
 
-        center = (right_fit[2] - left_fit[2]) / 2
+        #center = (right_fit[2] - left_fit[2]) / 2
 
         self.radius = right_curverad / left_curverad
 
         self.lane_width = np.mean((self.right_fitx - self.left_fitx) * self.xm_per_pix)
 
-        center_off = round(center - self.image.shape[0] / 2. * self.xm_per_pix, 2)
+        #center_off = round(center - self.image.shape[0] / 2. * self.xm_per_pix, 2)
 
         img_center = self.image.shape[1]/2
         lane_position_prcnt = np.interp(img_center, [self.left_fitx[-1], self.right_fitx[-1]], [0, 1])
@@ -521,23 +514,23 @@ class Lane:
     def sanity_check(self):
         """Decides whether the detected lane is valid or not"""
         #return True
-        print("---------------------------------------------------")
+        #print("---------------------------------------------------")
         if self.canDraw:
             if self.lane_width > 3.3 or self.lane_width < 2.4:
-                print("LANE WIDTH FAIL: " +str(self.lane_width))
+                #print("LANE WIDTH FAIL: " +str(self.lane_width))
                 return False
             if self.right_curverad < 300 or self.left_curverad < 300 or self.right_curverad > 15000 or self.left_curverad > 15000:
-                print("RIGHT CURVARAD FAIL: "+ str(self.right_curverad))
-                print("LEFT CURVARAD FAIL: " + str(self.left_curverad))
+                #print("RIGHT CURVARAD FAIL: "+ str(self.right_curverad))
+                #print("LEFT CURVARAD FAIL: " + str(self.left_curverad))
                 return  False
             if self.radius > 4 or self.radius < 0.2:
-                print("RADIUS FAIL: "  +str(self.radius))
+                #print("RADIUS FAIL: "  +str(self.radius))
                 return False
             #if self.center_off<0:
             #    return  False
             return True
         else:
-            print("CANT DRAW")
+            #print("CANT DRAW")
             return False
 
     def region_of_interest(self, img):
@@ -547,7 +540,7 @@ class Lane:
         imshape = img.shape
 
         vertices = np.array(
-             [[(0, imshape[0]*.85), (imshape[1] * .40, imshape[0] * .45), (imshape[1] * .55, imshape[0] * .45),
+             [[(0, imshape[0]*.85), (imshape[1] * .30, imshape[0] * .45), (imshape[1] * .65, imshape[0] * .45),
                (imshape[1], imshape[0]*.85)]], dtype=np.int32)  # creates an array with the trapezoids verticies
 
         vertices4 = np.array(
@@ -562,8 +555,8 @@ class Lane:
         #                     (imshape[1] * .7, imshape[0])]], dtype=np.int32)
 
         vert3 = np.array(
-            [[(300, imshape[0]), (imshape[1] * .45, imshape[0] * .65), (imshape[1] * .52, imshape[0] * .65),
-              (imshape[1] * .7, imshape[0])]], dtype=np.int32)
+            [[(400, imshape[0]), (imshape[1] * .45, imshape[0] * .45), (imshape[1] * .47, imshape[0] * .45),
+              (imshape[1] * .6, imshape[0])]], dtype=np.int32)
 
         cv.fillPoly(mask2, vert3, (255,) * 3)
         mask2 = cv.bitwise_not(mask2)
@@ -574,7 +567,7 @@ class Lane:
 
 
 class WindowFilter:
-    def __init__(self, pos_init=0.0, meas_variance=50, process_variance=0.1, uncertainty_init=2 ** 10):
+    def __init__(self, pos_init=0.0, meas_variance=10, process_variance=0.1, uncertainty_init=2 ** 10):
         """
         A one dimensional Kalman filter tuned to track the position of a window.
         State variable:   = [position,
@@ -597,7 +590,7 @@ class WindowFilter:
         self.kf.x = np.array([pos_init, 0])
 
         # Initial Covariance matrix
-        self.kf.P = np.eye(self.kf.dim_x) * uncertainty_init
+        self.kf.P = np.eye(self.kf.dim_x) *uncertainty_init
 
         # Measurement noise
         self.kf.R = np.array([[meas_variance]])
@@ -611,8 +604,9 @@ class WindowFilter:
         lane pixel.
         :param pos: measured x position of the pixel
         """
-        self.kf.predict()
         self.kf.update(pos)
+        self.kf.predict()
+
 
     def grow_uncertainty(self, mag):
         """Grows state uncertainty."""

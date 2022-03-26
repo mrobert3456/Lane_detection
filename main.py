@@ -41,7 +41,7 @@ def Process_adv(image):
 
     #return warped
 
-    blurred = cv.medianBlur(warped,3)
+    #blurred = cv.GaussianBlur(warped,(3,3),5)
     #return blurred
     global GoodLane
     global  firstLane
@@ -66,6 +66,7 @@ def Process_adv(image):
         result = laneProcess.draw_lines(warped, perspective=[s_mask, dest_mask], color=(0, 255, 0))
         if validLane:
             GoodLane = True
+            laneHistory.setError(0)
             laneHistory.SetLeft_fit(left_fit)  # good lanes are added to the history
             laneHistory.SetRight_fit(right_fit)
             laneHistory.SetLeftCurvature(laneProcess.GetLeft_Curve())
@@ -80,7 +81,7 @@ def Process_adv(image):
     else:
         GoodLane = False
 
-        if laneHistory.getError()>60:
+        if laneHistory.getError()>20:
             laneHistory.setError(0)
             firstLane=True
             prev_l =laneHistory.GetLeft_fit()[-1]
@@ -89,8 +90,8 @@ def Process_adv(image):
             laneHistory.GetLeft_fit().clear()
             laneHistory.GetRight_fit().clear()
 
-            laneHistory.SetLeft_fit(prev_l)
-            laneHistory.SetRight_fit(prev_r)
+            #laneHistory.SetLeft_fit(prev_l)
+            #laneHistory.SetRight_fit(prev_r)
 
         if len(laneHistory.GetLeft_fit()) >0 and len(laneHistory.GetRight_fit())>0:
             #avg_left_fitx, avg_right_fitx = get_avg_lane()

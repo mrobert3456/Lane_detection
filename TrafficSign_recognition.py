@@ -14,7 +14,7 @@ class TrafficSignDetector:
         self.model.load_weights('ts' + '/' + 'w_1_ts_rgb_255_mean.h5')
 
         # loading class names
-        self.labels = pd.read_csv('osztalyok.csv', sep=',')
+        self.labels = pd.read_csv('osztalyok.csv', sep=',',encoding='latin-1')
 
         # Converting into Numpy array
         self.labels = np.array(self.labels.loc[:, 'SignName']).flatten()
@@ -29,7 +29,7 @@ class TrafficSignDetector:
 
         # ----------------------darknet------------------------
 
-        self.path_to_weights = 'ts/yolov3_ts_train_final.weights'
+        self.path_to_weights = 'ts/yolov3_ts_traine_8000.weights'
         self.path_to_cfg = 'ts/yolov3_ts_test.cfg'
 
         # Loading trained YOLO v3 weights and cfg configuration file by 'dnn' library from OpenCV
@@ -112,7 +112,7 @@ class TrafficSignDetector:
         for result in output_from_network:
             # Going through all detections from current output layer
             for detected_objects in result:
-                # Getting 80 classes' probabilities for current detected object
+                # Getting classes' probabilities for current detected object
                 scores = detected_objects[5:]
                 # Getting index of the class with the maximum value of probability
                 class_current = np.argmax(scores)

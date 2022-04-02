@@ -28,16 +28,17 @@ def Process_adv(image):
     s_mask = perspective.setSource()
 
     #combined_img = Thresholder.thresholding_pipeline(image)
-    #binaryze the image
-    combined_img = Thresholder.img_thres(image)
 
-    #return  combined_img
     #get ROI
-    roi_image = laneProcess.region_of_interest(combined_img)
-
+    roi_image = laneProcess.region_of_interest(image)
     #return roi_image
+
+    #binaryze the image
+    combined_img = Thresholder.img_thres(roi_image)
+    #return  combined_img
+
     #Perspective transform
-    warped = perspective.perspective_transform(roi_image, s_mask, dest_mask)
+    warped = perspective.perspective_transform(combined_img, s_mask, dest_mask)
 
     #return warped
 

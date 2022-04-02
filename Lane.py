@@ -231,7 +231,7 @@ class Lane:
 
     def validateWindow(self,nonzerox,good_left_inds,good_right_inds,rightx_current,leftx_current,win_y_high,midpoint):
         # Set minimum number of pixels found to recenter window
-        minpix = 100
+        minpix = 200
         left_end=100
         right_end=100
         if len(good_left_inds) > minpix:
@@ -239,7 +239,7 @@ class Lane:
             self.left_kalmanFilter.update(rightx_current)
             lkf = int(self.left_kalmanFilter.get_position())
 
-            if lkf > 300 and lkf < midpoint:
+            if lkf > 200 and lkf < midpoint:
                 leftx_current = lkf-25
                 #left_end = win_y_high
             else:
@@ -266,7 +266,7 @@ class Lane:
     def sliding_windown(self,img_w,marginsize):
         """Returns the left and the right lane line points"""
         histogram = np.sum(img_w[int(img_w.shape[0] / 2):, :], axis=0)
-        # histogram = parallel.HistogramGPU(img_w) # gets the histogram of the image
+
         self.y_end=500
         # Creates an output image to draw on and visualize the result
         out_img = np.dstack((img_w, img_w, img_w)) # *255
@@ -290,14 +290,18 @@ class Lane:
         leftx_current = leftx_base
         rightx_current = rightx_base
 
+        color_right = (0, 255, 0) #green
+        color_left = (0, 255, 0) #green
         # if the base points of both lane lines are not found, then make an approximation
-        if leftx_current==0:
+        if leftx_current<200 :
             leftx_current = midpoint-250
-        if rightx_current ==0:
+            color_left = (0, 255, 255) # yellow
+        if rightx_current >1000 :
             rightx_current = midpoint+250
+            color_right = (255, 255, 0) # blue
 
 
-        #self.prev_Left_Windows.append(leftx_current)
+            #self.prev_Left_Windows.append(leftx_current)
         self.left_kalmanFilter.set_init_poz(leftx_current)
         self.right_kalmanFilter.set_init_poz(rightx_current)
 
@@ -310,7 +314,7 @@ class Lane:
         # Create empty lists to receive left and right lane pixel indices
         left_lane_inds = []
         right_lane_inds = []
-        color = (0, 255, 0)  # green
+
         # Step through the windows one by one
         for window in range(self.window_count):
             # Identify window boundaries in x and y (and right and left)
@@ -323,15 +327,13 @@ class Lane:
             win_xright_high = rightx_current + margin
 
             # Draw the windows on the visualization image
-            recone = cv.rectangle(out_img, (win_xleft_low, win_y_low), (win_xleft_high, win_y_high), color, 2)
-            rectwo = cv.rectangle(out_img, (win_xright_low, win_y_low), (win_xright_high, win_y_high), color, 2)
+            cv.rectangle(out_img, (win_xleft_low, win_y_low), (win_xleft_high, win_y_high), color_left, 2)
+            cv.rectangle(out_img, (win_xright_low, win_y_low), (win_xright_high, win_y_high), color_right, 2)
 
             # Identify the nonzero pixels in x and y within the window
-            good_left_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) & (nonzerox >= win_xleft_low) & (
-                    nonzerox < win_xleft_high)).nonzero()[0]
+            good_left_inds = ((nonzeroy >= win_y_low) & (nonzeroy <= win_y_high) & (nonzerox >= win_xleft_low) & (nonzerox <= win_xleft_high)).nonzero()[0]
 
-            good_right_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) & (nonzerox >= win_xright_low) & (
-                    nonzerox < win_xright_high)).nonzero()[0]
+            good_right_inds = ((nonzeroy >= win_y_low) & (nonzeroy <= win_y_high) & (nonzerox >= win_xright_low) & (nonzerox <= win_xright_high)).nonzero()[0]
 
             #determine the position of the next window
             rightx_current,leftx_current,left_end,right_end = self.validateWindow(nonzerox,good_left_inds,good_right_inds,rightx_current,leftx_current,win_y_high,midpoint)
@@ -547,6 +549,8 @@ class Lane:
             [[(0, imshape[0]), (imshape[1] * .38, imshape[0] * .65), (imshape[1] * .58, imshape[0] * .65),
               (imshape[1], imshape[0])]], dtype=np.int32)  # creates an array with the trapezoids verticies
 
+        vertl = np.array([[(40,720),(475,375),(805,375),(1180,720)]], dtype=np.int32)
+        vertm = np.array([[(190, 700), (580, 450), (730, 450), (1160, 700)]], dtype=np.int32)
 
         cv.fillPoly(mask, vertices, (255,) * 3)
         masked_image = cv.bitwise_and(img, mask)  # crops the original image with the mask
@@ -555,7 +559,7 @@ class Lane:
         #                     (imshape[1] * .7, imshape[0])]], dtype=np.int32)
 
         vert3 = np.array(
-            [[(400, imshape[0]), (imshape[1] * .45, imshape[0] * .45), (imshape[1] * .47, imshape[0] * .45),
+            [[(400, imshape[0]), (imshape[1] * .45, imshape[0] * .55), (imshape[1] * .47, imshape[0] * .55),
               (imshape[1] * .6, imshape[0])]], dtype=np.int32)
 
         cv.fillPoly(mask2, vert3, (255,) * 3)
@@ -567,7 +571,7 @@ class Lane:
 
 
 class WindowFilter:
-    def __init__(self, pos_init=0.0, meas_variance=10, process_variance=0.1, uncertainty_init=2 ** 10):
+    def __init__(self, pos_init=0.0, meas_variance=25, process_variance=0.1, uncertainty_init=2 ** 10):
         """
         A one dimensional Kalman filter tuned to track the position of a window.
         State variable:   = [position,

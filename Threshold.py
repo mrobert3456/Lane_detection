@@ -4,7 +4,7 @@ import numpy as np
 class ImgThreshold:
 
 
-    def thresholding_pipeline(self,image,sobel_kernel=7, mag_thresh=(3, 255), s_thresh=(170, 255), mod="LAB"):
+    def thresholding_pipeline(self,image,sobel_kernel=7, mag_thresh=(3, 255), s_thresh=(170, 255), mod="HSV"):
         hsv_image = image
         if mod == "HSV":
             hsv_image = cv.cvtColor(image, cv.COLOR_RGB2HSV)  # converts the input image into hsv colour space
@@ -54,9 +54,10 @@ class ImgThreshold:
                 :return: The score image.
                 """
         # Settings to run thresholding operations on
-        settings = [{'name': 'lab_b', 'cspace': 'LAB', 'channel': 2, 'clipLimit': 1.0, 'threshold': 180},
-                    {'name': 'value', 'cspace': 'HSV', 'channel': 2, 'clipLimit': 1.0, 'threshold': 220},
-                    {'name': 'lightness', 'cspace': 'HLS', 'channel': 1, 'clipLimit': 1.0, 'threshold': 210}]
+        settings = [ #{'name': 'lab_b', 'cspace': 'LAB', 'channel': 2, 'clipLimit': 1.0, 'threshold': 180},,
+                    {'name': 'lightness', 'cspace': 'HLS', 'channel': 1, 'clipLimit': 1.0, 'threshold': 210}]#,
+                    #{'name': 'value', 'cspace': 'HSV', 'channel': 2, 'clipLimit': 1.0, 'threshold': 220}]
+
 
         # Perform binary thresholding according to each setting and combine them into one image.
         scores = np.zeros(img.shape[0:2]).astype('uint8')

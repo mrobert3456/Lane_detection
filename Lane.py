@@ -125,7 +125,7 @@ class Lane:
         self.left_fitx=None
         self.right_fitx=None
         self.ym_per_pix = 30 / 720  # meters per pixel in y dimension
-        self.xm_per_pix = 4.7 / 640  # meters per pixel in x dimension
+        self.xm_per_pix = 5.7 / 640  # meters per pixel in x dimension
         self.perspectiveT=persp_t
 
         self.canDraw=False
@@ -243,7 +243,7 @@ class Lane:
                 leftx_current = lkf-25
                 #left_end = win_y_high
             else:
-                avgl = int((lkf + 1.1*maxl) / 2)
+                avgl = int((lkf + maxl) / 2)
                 leftx_current = avgl
                 #left_end = win_y_high
             left_end = win_y_high
@@ -257,7 +257,7 @@ class Lane:
                 rightx_current = rkf+25
                 #right_end = win_y_high
             else:
-                avgr = int((rkf + 1.1*maxr) / 2)
+                avgr = int((rkf + maxr) / 2)
                 rightx_current = avgr
                 #right_end = win_y_high
             right_end = win_y_high
@@ -483,7 +483,9 @@ class Lane:
 
         return out_img
 
-    def combine_images(self,orig_lane_img, lines_img, lines_regions_img, lane_hotspots_img, warped):
+
+
+    def combine_images(self,orig_lane_img, lines_img, lines_regions_img, lane_hotspots_img, warped, rawLane):
         """
         Returns an image, where the lane detection steps are shown as in smaller windows on the original image
         """
@@ -491,6 +493,7 @@ class Lane:
         small_region = cv.resize(lines_regions_img, self.small_img_size)
         small_hotspots = cv.resize(lane_hotspots_img, self.small_img_size)
         warped_window = cv.resize(warped, self.small_img_size)
+        raw_lane = cv.resize(rawLane,self.small_img_size)
 
         orig_lane_img[self.small_img_y_offset: self.small_img_y_offset + self.small_img_size[1],
         self.small_img_x_offset: self.small_img_x_offset + self.small_img_size[0]] = small_lines
@@ -512,20 +515,28 @@ class Lane:
         orig_lane_img[start_offset_y: start_offset_y + self.small_img_size[1],
         start_offset_x: start_offset_x + self.small_img_size[0]] = warped_window
 
+
+        start_offset_y = 500
+        start_offset_x = 10 * self.small_img_x_offset + 3 * self.small_img_size[0]
+
+        orig_lane_img[start_offset_y: start_offset_y + self.small_img_size[1],
+        start_offset_x: start_offset_x + self.small_img_size[0]] = raw_lane
+
+
         return orig_lane_img
     def sanity_check(self):
         """Decides whether the detected lane is valid or not"""
         #return True
         #print("---------------------------------------------------")
         if self.canDraw:
-            if self.lane_width > 3.3 or self.lane_width < 2.4:
+            if self.lane_width > 3.8 or self.lane_width < 2.8:
                 #print("LANE WIDTH FAIL: " +str(self.lane_width))
                 return False
             if self.right_curverad < 300 or self.left_curverad < 300 or self.right_curverad > 15000 or self.left_curverad > 15000:
                 #print("RIGHT CURVARAD FAIL: "+ str(self.right_curverad))
                 #print("LEFT CURVARAD FAIL: " + str(self.left_curverad))
                 return  False
-            if self.radius > 4 or self.radius < 0.2:
+            if self.radius > 4 or self.radius < 0.45:
                 #print("RADIUS FAIL: "  +str(self.radius))
                 return False
             #if self.center_off<0:

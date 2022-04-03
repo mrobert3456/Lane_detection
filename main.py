@@ -14,7 +14,7 @@ laneProcess = Lane(perspective)
 Thresholder =ImgThreshold()
 SignDetector = TrafficSignDetector()
 GoodLane = True
-capture = cv.VideoCapture('higwaytest.mp4')
+capture = cv.VideoCapture('ts_test2.mp4')
 # FPS counter
 counter = 0
 fps_start = timer()
@@ -28,6 +28,7 @@ def Process_adv(image):
     s_mask = perspective.setSource()
 
     #combined_img = Thresholder.thresholding_pipeline(image)
+    #return combined_img
 
     #get ROI
     roi_image = laneProcess.region_of_interest(image)
@@ -62,9 +63,10 @@ def Process_adv(image):
     drawn_hotspots = laneProcess.draw_lines_hotspots(warped, left_lane_inds, right_lane_inds)
     #cv.imshow('c', drawn_hotspots)
     #return drawn_hotspots
+    raw_lane = laneProcess.draw_lines(warped, perspective=[s_mask, dest_mask], color=(0, 255, 0))
     validLane = laneProcess.sanity_check()
     if  validLane or firstLane:
-        result = laneProcess.draw_lines(warped, perspective=[s_mask, dest_mask], color=(0, 255, 0))
+        result = raw_lane
         if validLane:
             GoodLane = True
             laneHistory.setError(0)
@@ -103,7 +105,7 @@ def Process_adv(image):
             result = image
     roi_og = laneProcess.region_of_interest(image)
     warped_or = perspective.perspective_transform(roi_og, s_mask, dest_mask)
-    laneProcess.combine_images(result, outimg, drawn_lines_regions, drawn_hotspots, warped_or)
+    laneProcess.combine_images(result, outimg, drawn_lines_regions, drawn_hotspots, warped_or,raw_lane)
     laneProcess.canDraw=False
     return result
 

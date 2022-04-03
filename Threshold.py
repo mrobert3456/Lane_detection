@@ -54,9 +54,9 @@ class ImgThreshold:
                 :return: The score image.
                 """
         # Settings to run thresholding operations on
-        settings = [ #{'name': 'lab_b', 'cspace': 'LAB', 'channel': 2, 'clipLimit': 1.0, 'threshold': 180},,
-                    {'name': 'lightness', 'cspace': 'HLS', 'channel': 1, 'clipLimit': 1.0, 'threshold': 210}]#,
-                    #{'name': 'value', 'cspace': 'HSV', 'channel': 2, 'clipLimit': 1.0, 'threshold': 220}]
+        settings = [ #{'name': 'lab_b', 'cspace': 'LAB', 'channel': 2, 'clipLimit': 1.0, 'threshold': 180},
+                    {'name': 'lightness', 'cspace': 'HLS', 'channel': 1, 'clipLimit': 1.0, 'threshold': 210},
+                    {'name': 'value', 'cspace': 'HSV', 'channel': 2, 'clipLimit': 1.0, 'threshold': 220}]
 
 
         # Perform binary thresholding according to each setting and combine them into one image.

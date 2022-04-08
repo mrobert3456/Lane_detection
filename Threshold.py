@@ -53,10 +53,10 @@ class ImgThreshold:
                 :param img: an image of a road, typically from an overhead perspective.
                 :return: The score image.
                 """
-        # Settings to run thresholding operations on
-        settings = [ #{'name': 'lab_b', 'cspace': 'LAB', 'channel': 2, 'clipLimit': 1.0, 'threshold': 180},
-                    {'name': 'lightness', 'cspace': 'HLS', 'channel': 1, 'clipLimit': 1.0, 'threshold': 210},
-                    {'name': 'value', 'cspace': 'HSV', 'channel': 2, 'clipLimit': 1.0, 'threshold': 220}]
+        # {'name': 'lab_b', 'cspace': 'LAB', 'channel': 2, 'clipLimit': 1.0, 'threshold': 180},
+        # Thresholding settings
+        settings = [{'cspace': 'HLS', 'channel': 1, 'clipLimit': 2.0, 'threshold': 210},
+                    {'cspace': 'HSV', 'channel': 2, 'clipLimit': 2.0, 'threshold': 220}]
 
 
         # Perform binary thresholding according to each setting and combine them into one image.

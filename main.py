@@ -14,7 +14,7 @@ laneProcess = Lane(perspective)
 Thresholder =ImgThreshold()
 SignDetector = TrafficSignDetector()
 GoodLane = True
-capture = cv.VideoCapture('ts_test2.mp4')
+capture = cv.VideoCapture('higwaytest.mp4')
 # FPS counter
 counter = 0
 fps_start = timer()
@@ -105,7 +105,7 @@ def Process_adv(image):
             result = image
     roi_og = laneProcess.region_of_interest(image)
     warped_or = perspective.perspective_transform(roi_og, s_mask, dest_mask)
-    laneProcess.combine_images(result, outimg, drawn_lines_regions, drawn_hotspots, warped_or,raw_lane)
+    laneProcess.combine_images(result, outimg, drawn_hotspots, drawn_lines_regions, warped_or,raw_lane)
     laneProcess.canDraw=False
     return result
 

@@ -8,10 +8,10 @@ from tensorflow.keras.models import load_model
 
 class TrafficSignDetector:
     def __init__(self):
-        self.model = load_model('ts' + '/' + 'model_ts_rgb.h5')
+        self.model = load_model('ts' + '/' + 'model_1_ts_gray.h5')
 
         # loading trained weights
-        self.model.load_weights('ts' + '/' + 'w_1_ts_rgb_255_mean.h5')
+        self.model.load_weights('ts' + '/' + 'w_1_dataset_ts_gray_norm.h5')
 
         # loading class names
         self.labels = pd.read_csv('osztalyok.csv', sep=',',encoding='latin-1')
@@ -19,13 +19,14 @@ class TrafficSignDetector:
         # Converting into Numpy array
         self.labels = np.array(self.labels.loc[:, 'SignName']).flatten()
 
-        # open dataset
+        # open dataset -> it is only needed for the mean subraction dataset
         with h5py.File('ts' + '/' + 'mean_rgb_dataset_ts.hdf5', 'r') as f:
             # Extracting saved array for Mean Image
             self.mean_rgb = f['mean']  # HDF5 dataset
 
             # Converting it into Numpy array
             self.mean_rgb = np.array(self.mean_rgb)  # Numpy arrays
+
 
         # ----------------------darknet------------------------
 
@@ -40,23 +41,14 @@ class TrafficSignDetector:
         self.network.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA_FP16)
 
         # Minimum probability to eliminate weak detections
-        self.probability_minimum = 0.9
+        self.probability_minimum = 0.6
         # Setting threshold to filtering weak bounding boxes by non-maximum suppression
         self.threshold = 0.2
-
-        # Generating colours for bounding boxes
-        # randint(low, high=None, size=None, dtype='l')
-        self.colours = np.random.randint(0, 255, size=(len(self.labels), 3), dtype='uint8')
-
-        # Check point
 
         # Getting names of all YOLO v3 layers
         self.layers_all = self.network.getLayerNames()
 
-        # Check point
-        # print(layers_all)
-
-        # Getting only detection YOLO v3 layers that are 82, 94 and 106
+        # Getting only detection YOLO v3 layers
         self.layers_names_output = [self.layers_all[i - 1] for i in self.network.getUnconnectedOutLayers()]
 
         #writer = None
@@ -87,21 +79,12 @@ class TrafficSignDetector:
             # Slicing two elements from tuple
             h, w = frame.shape[:2]
 
-        # Blob from current frame
+        # Blob from current frame -> this preprocessing the image to be normalized, resized and converts into RGB
         blob = cv2.dnn.blobFromImage(frame, 1 / 255.0, (416, 416), swapRB=True, crop=False)
 
         # Forward pass with blob through output layers
         self.network.setInput(blob)
-        # start = time.time()
         output_from_network = self.network.forward(self.layers_names_output)
-        # end = time.time()
-
-        # Increasing counters
-        #  f += 1
-        # t += end - start
-
-        # Spent time for current frame
-        # print('Frame number {0} took {1:.5f} seconds'.format(f, end - start))
 
         # Lists for detected bounding boxes, confidences and class's number
         bounding_boxes = []
@@ -135,6 +118,7 @@ class TrafficSignDetector:
                     class_numbers.append(class_current)
 
         # Implementing non-maximum suppression of given bounding boxes
+        # this will get only the relevant bounding boxes (there might be more which crosses each other, and etc)
         results = cv2.dnn.NMSBoxes(bounding_boxes, confidences, self.probability_minimum, self.threshold)
 
         # Checking if there is any detected object been left
@@ -157,6 +141,13 @@ class TrafficSignDetector:
                     # plt.imshow(blob_ts[0, :, :, :])
                     # plt.show()
 
+                    # CONVERTING GRAY, CAN BE OMITTED IF YOU ARE USING RGB MODELL
+                    blob_ts = np.squeeze(blob_ts)  # shape (48,48,3)
+
+                    blob_ts = cv2.cvtColor(blob_ts, cv2.COLOR_RGB2GRAY)  # shape (48,48)
+
+                    blob_ts = blob_ts[np.newaxis, :, :, np.newaxis]  # shape (1,48,48,1)
+
                     # Feeding to the Keras CNN model to get predicted label among 43 classes
                     scores = self.model.predict(blob_ts)
 
@@ -164,9 +155,6 @@ class TrafficSignDetector:
                     # Getting only one class with maximum value
                     prediction = np.argmax(scores)
                     # print(labels['SignName'][prediction])
-
-                    # Colour for current bounding box
-                    colour_box_current = self.colours[class_numbers[i]].tolist()
 
                     # Drawing bounding box on the original current frame
                     cv2.rectangle(img, (x_min, y_min),
@@ -179,5 +167,5 @@ class TrafficSignDetector:
 
                     # Putting text with label and confidence on the original image
                     cv2.putText(img, text_box_current, (x_min, y_min - 5),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, colour_box_current, 2)
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,255), 2)
         return img

@@ -128,6 +128,7 @@ def get_avg_lane():
     return avg_left_fitx, avg_right_fitx
 
 
+writer = None
 while capture.isOpened():
     ret, frame1 = capture.read()
     ret2, frame = capture.read()
@@ -158,8 +159,20 @@ while capture.isOpened():
         # Getting current time point in seconds
         fps_start = timer()
 
+        # Initializing writer only once
+        if writer is None:
+            fourcc = cv.VideoWriter_fourcc(*'mp4v')
+
+            # Writing current processed frame into the video file
+            writer = cv.VideoWriter('result_higway.mp4', fourcc, 25,
+                                     (frame.shape[1], frame.shape[0]), True)
+
+        # Write processed current frame to the file
+        writer.write(frame)
+
     if cv.waitKey(1) & 0xFF == ord('q'):
         break
 
 capture.release()
+writer.release()
 cv.destroyAllWindows()

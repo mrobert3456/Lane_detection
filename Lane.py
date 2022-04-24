@@ -117,7 +117,7 @@ class LaneHistory:
 class Lane:
     def __init__(self, persp_t):
         self.image = []
-        self.window_count = 15
+        self.window_count = 9
         self.small_img_size = (256, 144)
         self.small_img_x_offset = 20
         self.small_img_y_offset = 10
@@ -131,14 +131,12 @@ class Lane:
         self.ym_per_pix = 30 / 720  # meters per pixel in y dimension
         self.xm_per_pix = 5.7 / 640  # meters per pixel in x dimension
         self.perspectiveT = persp_t
-
         self.canDraw = False
         self.left_kalmanFilter = WindowFilter(pos_init=1280 / 4)
         self.right_kalmanFilter = WindowFilter(pos_init=1280 - (1280 / 4))
-
         self.y_end = 500
         self.ploty = 600
-
+        self.direction=None
     def SetImg(self, img):
         self.image = img
         return
@@ -251,8 +249,8 @@ class Lane:
                 avgl = int((lkf + maxl) / 2)
                 leftx_current = avgl
 
+            #leftx_current = int(np.mean(nonzerox[good_left_inds]))
             left_end = win_y_high
-
         if len(good_right_inds) > minpix:
             self.right_kalmanFilter.update(leftx_current)
             rkf = int(self.right_kalmanFilter.get_position())
@@ -262,6 +260,7 @@ class Lane:
                 maxr = int(np.mean(nonzerox[good_right_inds]))
                 avgr = int((rkf + maxr) / 2)
                 rightx_current = avgr
+            #rightx_current = int(np.mean(nonzerox[good_right_inds]))
             right_end = win_y_high
 
         return rightx_current, leftx_current, left_end, right_end
@@ -276,7 +275,6 @@ class Lane:
         # These will be the starting point for the left and right lines
         leftx_base = np.argmax(histogram[:midpoint])
         rightx_base = np.argmax(histogram[midpoint:]) + midpoint
-
         # Set height of windows
         window_height = int(img_w.shape[0] / self.window_count)
 
@@ -434,6 +432,13 @@ class Lane:
 
         img_center = self.image.shape[1] / 2
         lane_position_prcnt = np.interp(img_center, [self.left_fitx[-1], self.right_fitx[-1]], [0, 1])
+        if lane_position_prcnt<0.4:
+            self.direction = 'LEFT'
+        elif lane_position_prcnt>0.6:
+            self.direction='RIGHT'
+        else:
+            self.direction="STRAIGHT"
+
         lane_position = lane_position_prcnt * self.lane_width
         return right_curverad, left_curverad, lane_position
 
@@ -518,8 +523,8 @@ class Lane:
         orig_lane_img[start_offset_y: start_offset_y + self.small_img_size[1],
         start_offset_x: start_offset_x + self.small_img_size[0]] = warped_window
 
-        start_offset_y = 500
-        start_offset_x = 10 * self.small_img_x_offset + 3 * self.small_img_size[0]
+        #start_offset_y = 500
+        #start_offset_x = 10 * self.small_img_x_offset + 3 * self.small_img_size[0]
 
         #orig_lane_img[start_offset_y: start_offset_y + self.small_img_size[1],
         #start_offset_x: start_offset_x + self.small_img_size[0]] = raw_lane
@@ -528,15 +533,16 @@ class Lane:
 
     def sanity_check(self):
         """Decides whether the detected lane is valid or not"""
-        # return True
+        #return True
         # print("---------------------------------------------------")
         if self.canDraw:
+            #return True
             if self.lane_width > 3.8 or self.lane_width < 2.8:
-                # print("LANE WIDTH FAIL: " +str(self.lane_width))
+                #print("LANE WIDTH FAIL: " +str(self.lane_width))
                 return False
             if self.right_curverad < 300 or self.left_curverad < 300 or self.right_curverad > 15000 or self.left_curverad > 15000:
-                # print("RIGHT CURVARAD FAIL: "+ str(self.right_curverad))
-                # print("LEFT CURVARAD FAIL: " + str(self.left_curverad))
+                #print("RIGHT CURVARAD FAIL: "+ str(self.right_curverad))
+                #print("LEFT CURVARAD FAIL: " + str(self.left_curverad))
                 return False
             if self.radius > 4 or self.radius < 0.45:
                 #print("RADIUS FAIL: "  +str(self.radius))
@@ -583,7 +589,7 @@ class Lane:
 
 
 class WindowFilter:
-    def __init__(self, pos_init=0.0, meas_variance=25, process_variance=0.1, uncertainty_init=2 ** 10):
+    def __init__(self, pos_init=0.0, meas_variance=40, process_variance=0.1, uncertainty_init=2 ** 10):
         """
         A one dimensional Kalman filter tuned to track the position of a window.
         State variable:   = [position,
@@ -606,7 +612,7 @@ class WindowFilter:
         self.kf.x = np.array([pos_init, 0])
 
         # Initial Covariance matrix
-        self.kf.P = np.eye(self.kf.dim_x) * uncertainty_init
+        self.kf.P = np.eye(self.kf.dim_x) * uncertainty_init # updated the uncertanity
 
         # Measurement noise
         self.kf.R = np.array([[meas_variance]])

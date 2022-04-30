@@ -8,10 +8,10 @@ from tensorflow.keras.models import load_model
 
 class TrafficSignDetector:
     def __init__(self):
-        self.model = load_model('ts' + '/' + 'model_1_ts_gray.h5')
+        self.model = load_model('ts/model_1_ts_gray.h5')
 
         # loading trained weights
-        self.model.load_weights('ts' + '/' + 'w_1_dataset_ts_gray_norm.h5')
+        self.model.load_weights('ts/w_1_dataset_ts_gray_norm.h5')
 
         # loading class names
         self.labels = pd.read_csv('osztalyok.csv', sep=',',encoding='latin-1')
@@ -20,7 +20,7 @@ class TrafficSignDetector:
         self.labels = np.array(self.labels.loc[:, 'SignName']).flatten()
 
         # open dataset -> it is only needed for the mean subraction dataset
-        with h5py.File('ts' + '/' + 'mean_rgb_dataset_ts.hdf5', 'r') as f:
+        with h5py.File('ts/mean_rgb_dataset_ts.hdf5', 'r') as f:
             # Extracting saved array for Mean Image
             self.mean_rgb = f['mean']  # HDF5 dataset
 
@@ -107,7 +107,7 @@ class TrafficSignDetector:
                     # Scaling bounding box coordinates to the initial frame size
                     box_current = detected_objects[0:4] * np.array([w, h, w, h])
 
-                    # Getting top left corner coordinates
+                    # Getting top left corner coordinates [bounding box coordinates]
                     x_center, y_center, box_width, box_height = box_current
                     x_min = int(x_center - (box_width / 2))
                     y_min = int(y_center - (box_height / 2))
@@ -134,7 +134,7 @@ class TrafficSignDetector:
                 if c_ts.shape[:1] == (0,) or c_ts.shape[1:2] == (0,):
                     pass
                 else:
-                    # Getting preprocessed blob with Traffic Sign of needed shape
+                    # Getting preprocessed blob with Traffic Sign 48x48 shape
                     blob_ts = cv2.dnn.blobFromImage(c_ts, 1 / 255.0, size=(48, 48), swapRB=True, crop=False)
                     # blob_ts[0] = blob_ts[0, :, :, :] - mean['mean_image_rgb']
                     blob_ts = blob_ts.transpose(0, 2, 3, 1)
@@ -148,13 +148,11 @@ class TrafficSignDetector:
 
                     blob_ts = blob_ts[np.newaxis, :, :, np.newaxis]  # shape (1,48,48,1)
 
-                    # Feeding to the Keras CNN model to get predicted label among 43 classes
+                    # Predict ts sign
                     scores = self.model.predict(blob_ts)
 
-                    # Scores is given for image with 43 numbers of predictions for each class
-                    # Getting only one class with maximum value
+                    # Getting the class with the highest probability
                     prediction = np.argmax(scores)
-                    # print(labels['SignName'][prediction])
 
                     # Drawing bounding box on the original current frame
                     cv2.rectangle(img, (x_min, y_min),

@@ -78,7 +78,9 @@ def Process_adv(image):
             laneHistory.setWidth(laneProcess.getWidth())
             laneHistory.setRadius(laneProcess.getRadius())
             laneHistory.setPloty(laneProcess.getPloty())
+            laneHistory.SetDirection(laneProcess.getDirection())
             laneProcess.putDatasOnScreen(result)
+            result = laneProcess.display_heading_line(result,laneProcess.getDirection())
         firstLane=False
 
     else:
@@ -100,6 +102,7 @@ def Process_adv(image):
             #avg_left_fitx, avg_right_fitx = get_avg_lane()
             result = laneProcess.draw_lines_fromHistory( warped,  laneHistory.GetLeft_fit()[-1], laneHistory.GetRight_fit()[-1],laneHistory.ploty, perspective=[s_mask, dest_mask],color=(0, 255, 255))
             laneHistory.incrementError()
+            result  = laneProcess.display_heading_line(result,laneHistory.getDirection())
             laneHistory.putHistoryDataOnScreen(result)
         else:
             result = image
@@ -129,9 +132,12 @@ def get_avg_lane():
 
 
 writer = None
+
 while capture.isOpened():
     ret, frame1 = capture.read()
     ret2, frame = capture.read()
+
+
     # if frame is read correctly ret is True
     frame =cv.resize(frame,(1280,720))
     #frame =SignDetector.DetectSign(frame)

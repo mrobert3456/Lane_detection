@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 import cv2 as cv
 from filterpy.common import Q_discrete_white_noise
@@ -15,7 +17,7 @@ class LaneHistory:
         self.lane_width = []
         self.center_off = []
         self.errorCount = 0
-
+        self.steering_angle=0
         self.ploty = None
 
     def setWidth(self, value):
@@ -42,6 +44,9 @@ class LaneHistory:
 
     def GetLeft_fit(self):
         return self.left_fit
+
+    def getDirection(self):
+        return self.steering_angle
 
     def GetRight_fit(self):
         return self.right_fit
@@ -78,6 +83,9 @@ class LaneHistory:
         self.center_off.append(offset)
         return
 
+    def SetDirection(self,value):
+        self.steering_angle = value
+
     def putHistoryDataOnScreen(self, img):
         # Show position
 
@@ -105,9 +113,9 @@ class LaneHistory:
                   color=(255, 255, 255))
 
         # print to image
-        text = "radius = %s [m]\nwidth = %s [m]\nLeft_curve = %s\nRight_curve = %s" % (
+        text = "radius = %s [m]\nwidth = %s [m]\nLeft_curve = %s\nRight_curve = %s\nSteering_angle = %s [degree]" % (
             str(self.radius), str(self.lane_width), str(self.left_curverad[-1]),
-            str(self.right_curverad[-1]))
+            str(self.right_curverad[-1]), str(self.steering_angle))
         for i, line in enumerate(text.split('\n')):
             i = 50 + 20 * i
             cv.putText(img, line, (0, 200 + i), cv.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255), 1, cv.LINE_AA)
@@ -137,6 +145,7 @@ class Lane:
         self.y_end = 500
         self.ploty = 600
         self.direction=None
+        self.steering_angle=0
     def SetImg(self, img):
         self.image = img
         return
@@ -165,9 +174,13 @@ class Lane:
     def getPloty(self):
         return self.ploty
 
+    def getDirection(self):
+        return self.steering_angle
+
     def putDatasOnScreen(self, img):
 
         # Show position
+
         lane_position_prcnt = self.center_off / self.lane_width
 
         x_text_start, y_text_start = (10, 450)
@@ -192,9 +205,9 @@ class Lane:
                   radius=8,
                   color=(255, 255, 255))
 
-        text = "radius = %s [m]\nwidth = %s [m]\nLeft_curve = %s\nRight_curve = %s" % (
+        text = "radius = %s [m]\nwidth = %s [m]\nLeft_curve = %s\nRight_curve = %s\nSteering_angle = %s [degree]" % (
             str(self.radius), str(self.lane_width), str(self.left_curverad),
-            str(self.right_curverad))
+            str(self.right_curverad), str(self.steering_angle))
         for i, line in enumerate(text.split('\n')):
             i = 50 + 20 * i
             cv.putText(img, line, (0, 200 + i), cv.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255), 1, cv.LINE_AA)
@@ -230,6 +243,7 @@ class Lane:
             self.left_curverad, self.right_curverad, self.center_off = self.GetCurv(self.ploty, left_fit, right_fit)
         else:
             self.canDraw = False
+        #print(str(self.left_fitx[0])+" "+str(self.right_fitx[0]))
         return left_fit, right_fit
 
     def validateWindow(self, nonzerox, good_left_inds, good_right_inds, rightx_current, leftx_current, win_y_high,
@@ -405,10 +419,63 @@ class Lane:
             return result
         return self.image
 
+    def display_heading_line(self,frame, steering_angle, line_color=(0, 0, 255), line_width=5):
+        heading_image = np.zeros_like(frame)
+        height, width, _ = frame.shape
+
+        # figure out the heading line from steering angle
+        # heading line (x1,y1) is always center bottom of the screen
+        # (x2, y2) requires a bit of trigonometry
+
+        # Note: the steering angle of:
+        # 0-89 degree: turn left
+        # 90 degree: going straight
+        # 91-180 degree: turn right
+        steering_angle_radian = steering_angle / 180.0 * math.pi
+        x1 = int(width / 2)
+        y1 = height-100
+        x2 = int(x1 - height / 2 / math.tan(steering_angle_radian))
+        y2 = int(height / 2)+20
+        cv.line(heading_image, (x1, y1), (x2, y2), line_color, line_width)
+        heading_image = cv.addWeighted(frame, 0.8, heading_image, 1, 1)
+
+        return heading_image
+
+    def stabilize_steering_angle(self,
+            curr_steering_angle,
+            new_steering_angle,
+            max_angle_deviation_two_lines=4,):
+        """
+        Using last steering angle to stabilize the steering angle
+        if new angle is too different from current angle,
+        only turn by max_angle_deviation degrees
+        """
+
+        max_angle_deviation = max_angle_deviation_two_lines
+
+        angle_deviation = new_steering_angle - curr_steering_angle
+        if abs(angle_deviation) > max_angle_deviation:
+            stabilized_steering_angle = int(curr_steering_angle
+                                            + max_angle_deviation * angle_deviation / abs(angle_deviation))
+        else:
+            stabilized_steering_angle = new_steering_angle
+        return stabilized_steering_angle
     def GetCurv(self, ploty, left_fit, right_fit):
         """Gets the curvature , radius, lane width, and center offset"""
         y_eval = np.max(ploty)  # Analyze only the top part of the lane
+        center = int(self.image.shape[1] / 2)
 
+        xLeft = self.left_fitx[0]
+        xRight = self.right_fitx[0]
+
+        xOffset = (xLeft+xRight)/2-center
+        yOffset = int(self.image.shape[0])
+
+        angle_to_radian = math.atan(xOffset / yOffset)
+        angle_to_deg = int(angle_to_radian * 180.0 / math.pi)
+        new_steering_angle= angle_to_deg + 90
+
+        self.steering_angle = self.stabilize_steering_angle(self.steering_angle, new_steering_angle)
         # Fit new polynomials to x,y in world space
         left_fit_cr = np.polyfit(ploty * self.ym_per_pix, self.left_fitx * self.xm_per_pix, 2)
         right_fit_cr = np.polyfit(ploty * self.ym_per_pix, self.right_fitx * self.xm_per_pix, 2)
@@ -432,12 +499,7 @@ class Lane:
 
         img_center = self.image.shape[1] / 2
         lane_position_prcnt = np.interp(img_center, [self.left_fitx[-1], self.right_fitx[-1]], [0, 1])
-        if lane_position_prcnt<0.4:
-            self.direction = 'LEFT'
-        elif lane_position_prcnt>0.6:
-            self.direction='RIGHT'
-        else:
-            self.direction="STRAIGHT"
+
 
         lane_position = lane_position_prcnt * self.lane_width
         return right_curverad, left_curverad, lane_position

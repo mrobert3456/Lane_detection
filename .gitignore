@@ -128,19 +128,9 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# weight files
-.weights
-
-#yolo model
-.cfg
-
-#CNN train datas
-.hdf5
-
-#CNN models
-.h5
-
+ts/
+m_ts/
+detection_training/
 #test videos
-.mp4
-.png
-.rar
+*.mp4
+

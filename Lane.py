@@ -257,7 +257,7 @@ class Lane:
             lkf = int(self.left_kalmanFilter.get_position())
 
             if 200 < lkf < midpoint:
-                leftx_current = lkf - 25
+                leftx_current = lkf #- 25
             else:
                 maxl = int(np.mean(nonzerox[good_left_inds]))
                 avgl = int((lkf + maxl) / 2)
@@ -269,7 +269,7 @@ class Lane:
             self.right_kalmanFilter.update(leftx_current)
             rkf = int(self.right_kalmanFilter.get_position())
             if midpoint < rkf < 860:
-                rightx_current = rkf + 25
+                rightx_current = rkf #+ 25
             else:
                 maxr = int(np.mean(nonzerox[good_right_inds]))
                 avgr = int((rkf + maxr) / 2)
@@ -444,7 +444,7 @@ class Lane:
     def stabilize_steering_angle(self,
             curr_steering_angle,
             new_steering_angle,
-            max_angle_deviation_two_lines=4,):
+            max_angle_deviation_two_lines=3,):
         """
         Using last steering angle to stabilize the steering angle
         if new angle is too different from current angle,
@@ -606,7 +606,7 @@ class Lane:
                 #print("RIGHT CURVARAD FAIL: "+ str(self.right_curverad))
                 #print("LEFT CURVARAD FAIL: " + str(self.left_curverad))
                 return False
-            if self.radius > 4 or self.radius < 0.45:
+            if self.radius > 4 or self.radius < 0.2:
                 #print("RADIUS FAIL: "  +str(self.radius))
                 return False
             # if self.center_off<0:
@@ -663,7 +663,7 @@ class WindowFilter:
         """
         self.kf = KalmanFilter(dim_x=2, dim_z=1)
 
-        # State transition function
+        # State transition matrix
         self.kf.F = np.array([[1., 1],
                               [0., 0.5]])
 
@@ -688,8 +688,9 @@ class WindowFilter:
         lane pixel.
         :param pos: measured x position of the pixel
         """
-        self.kf.update(pos)
         self.kf.predict()
+        self.kf.update(pos)
+
 
     def grow_uncertainty(self, mag):
         """Grows state uncertainty."""

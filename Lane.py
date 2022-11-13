@@ -145,7 +145,7 @@ class Lane:
         self.y_end = 500
         self.ploty = 600
         self.direction=None
-        self.steering_angle=0
+        self.steering_angle=90
     def SetImg(self, img):
         self.image = img
         return

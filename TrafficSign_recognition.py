@@ -2,8 +2,6 @@ import pandas as pd
 import numpy as np
 import h5py
 import cv2
-import io
-import os
 from tensorflow.keras.models import load_model
 
 class TrafficSignDetector:
@@ -73,8 +71,10 @@ class TrafficSignDetector:
         return masked_image
 
     def DetectSign(self,img):
+        """
+        Detection traffic signs in the input image
+        """
         frame = self.ROI(img)
-        #return frame
         if self.w is None or self.h is None:
             # Slicing two elements from tuple
             h, w = frame.shape[:2]
@@ -95,24 +95,24 @@ class TrafficSignDetector:
         for result in output_from_network:
             # Going through all detections from current output layer
             for detected_objects in result:
-                # Getting classes' probabilities for current detected object
+                # class probabilities
                 scores = detected_objects[5:]
-                # Getting index of the class with the maximum value of probability
+                # index of the most probable class
                 class_current = np.argmax(scores)
-                # Getting value of probability for defined class
+                # Getting probability values for current class
                 confidence_current = scores[class_current]
 
-                # Eliminating weak predictions by minimum probability
+
                 if confidence_current > self.probability_minimum:
                     # Scaling bounding box coordinates to the initial frame size
                     box_current = detected_objects[0:4] * np.array([w, h, w, h])
 
-                    # Getting top left corner coordinates [bounding box coordinates]
+                    # Getting top left corner coordinates of bounding box
                     x_center, y_center, box_width, box_height = box_current
                     x_min = int(x_center - (box_width / 2))
                     y_min = int(y_center - (box_height / 2))
 
-                    # Adding results into prepared lists
+
                     bounding_boxes.append([x_min, y_min, int(box_width), int(box_height)])
                     confidences.append(float(confidence_current))
                     class_numbers.append(class_current)
@@ -123,7 +123,7 @@ class TrafficSignDetector:
 
         # Checking if there is any detected object been left
         if len(results) > 0:
-            # Going through indexes of results
+
             for i in results.flatten():
                 # Bounding box coordinates, its width and height
                 x_min, y_min = bounding_boxes[i][0], bounding_boxes[i][1]
@@ -159,11 +159,11 @@ class TrafficSignDetector:
                                   (x_min + box_width, y_min + box_height),
                                   (0, 255, 0), 2)
 
-                    # Preparing text with label and confidence for current bounding box
+
                     text_box_current = '{}: {:.4f}'.format(self.labels[prediction],
                                                            confidences[i])
 
-                    # Putting text with label and confidence on the original image
+
                     cv2.putText(img, text_box_current, (x_min, y_min - 5),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,255), 2)
         return img

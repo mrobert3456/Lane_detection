@@ -17,13 +17,10 @@ class TrafficSignDetector:
         # Converting into Numpy array
         self.labels = np.array(self.labels.loc[:, 'SignName']).flatten()
 
-        # open dataset -> it is only needed for the mean subraction dataset
-        with h5py.File('ts/mean_rgb_dataset_ts.hdf5', 'r') as f:
-            # Extracting saved array for Mean Image
-            self.mean_rgb = f['mean']  # HDF5 dataset
-
-            # Converting it into Numpy array
-            self.mean_rgb = np.array(self.mean_rgb)  # Numpy arrays
+        # open dataset -> it is only needed for the mean subraction dataset, or for std dataset
+        #with h5py.File('ts/mean_rgb_dataset_ts.hdf5', 'r') as f:
+        #    self.mean_rgb = f['mean']  # HDF5 dataset
+        #    self.mean_rgb = np.array(self.mean_rgb)  # Numpy arrays
 
 
         # ----------------------darknet------------------------
@@ -61,8 +58,6 @@ class TrafficSignDetector:
         vertices = np.array(
             [[(0, imshape[0]*0.5), (imshape[1]*.1 , imshape[0]*.1 ), (imshape[1]*.8 , imshape[0]*.1),
               (imshape[1], imshape[0]*0.5)]], dtype=np.int32)  # creates an array with the trapezoids verticies
-
-
 
         cv2.fillPoly(mask, vertices, (255,) * 3)
         masked_image = cv2.bitwise_and(img, mask)  # crops the original image with the mask
@@ -134,12 +129,11 @@ class TrafficSignDetector:
                 if c_ts.shape[:1] == (0,) or c_ts.shape[1:2] == (0,):
                     pass
                 else:
-                    # Getting preprocessed blob with Traffic Sign 48x48 shape
+                    # Blob from current frame -> this preprocessing the image to be normalized, resized and converts into RGB
                     blob_ts = cv2.dnn.blobFromImage(c_ts, 1 / 255.0, size=(48, 48), swapRB=True, crop=False)
-                    # blob_ts[0] = blob_ts[0, :, :, :] - mean['mean_image_rgb']
+                    #blob_ts[0] = blob_ts[0, :, :, :] - self.mean_rgb # only needed for mean subtraction
+                    #blob_ts[0] = blob_ts[0, :, :, :] / self.std_rgb # only needed for std
                     blob_ts = blob_ts.transpose(0, 2, 3, 1)
-                    # plt.imshow(blob_ts[0, :, :, :])
-                    # plt.show()
 
                     # CONVERTING GRAY, CAN BE OMITTED IF YOU ARE USING RGB MODELL
                     blob_ts = np.squeeze(blob_ts)  # shape (48,48,3)
@@ -148,10 +142,10 @@ class TrafficSignDetector:
 
                     blob_ts = blob_ts[np.newaxis, :, :, np.newaxis]  # shape (1,48,48,1)
 
-                    # Predict ts sign
+
                     scores = self.model.predict(blob_ts)
 
-                    # Getting the class with the highest probability
+                    # highest probability class
                     prediction = np.argmax(scores)
 
                     # Drawing bounding box on the original current frame

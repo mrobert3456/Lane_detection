@@ -47,8 +47,6 @@ class Perspective:
         """Gets the bird eye view of the image"""
         """From a bird eye view, the lane lines can be seen as parallel, as it is, but from the original view it seems as the lines are coming together in distance"""
         img_size = (img.shape[1], img.shape[0])
-        # src = np.float32(src_m)  # source transformation matrix
-        # dest = np.float32(dest_m)  # destination transformation matrix
         M = cv.getPerspectiveTransform(src_m, dest_m)  # gets the perpective transformation matrix
-        warped_img = cv.warpPerspective(img, M, img_size)  # warps the image #, flags=cv.INTER_LINEAR
+        warped_img = cv.warpPerspective(img, M, img_size)  # warps the image
         return warped_img

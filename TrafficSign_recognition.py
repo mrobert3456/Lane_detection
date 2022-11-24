@@ -8,13 +8,9 @@ class TrafficSignDetector:
     def __init__(self):
         self.model = load_model('ts/model_1_ts_gray.h5')
 
-        # loading trained weights
         self.model.load_weights('ts/w_1_dataset_ts_gray_norm.h5')
 
-        # loading class names
         self.labels = pd.read_csv('osztalyok.csv', sep=',',encoding='latin-1')
-
-        # Converting into Numpy array
         self.labels = np.array(self.labels.loc[:, 'SignName']).flatten()
 
         # open dataset -> it is only needed for the mean subraction dataset, or for std dataset
@@ -28,22 +24,17 @@ class TrafficSignDetector:
         self.path_to_weights = 'ts/yolov3_ts_traine_8000.weights'
         self.path_to_cfg = 'ts/yolov3_ts_test.cfg'
 
-        # Loading trained YOLO v3 weights and cfg configuration file by 'dnn' library from OpenCV
+        # Loading trained YOLO v3 weights and cfg files
         self.network = cv2.dnn.readNetFromDarknet(self.path_to_cfg, self.path_to_weights)
 
-        # To use with GPU
-        self.network.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
-        self.network.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA_FP16)
-
-        # Minimum probability to eliminate weak detections
         self.probability_minimum = 0.6
-        # Setting threshold to filtering weak bounding boxes by non-maximum suppression
+        # bounding boxes threshold for non-maximum suppression
         self.threshold = 0.2
 
-        # Getting names of all YOLO v3 layers
+        #getting the outpout layers of yolov3
+        #YOLO v3 layer names
         self.layers_all = self.network.getLayerNames()
-
-        # Getting only detection YOLO v3 layers
+        # index of output layers
         self.layers_names_output = [self.layers_all[i - 1] for i in self.network.getUnconnectedOutLayers()]
 
         #writer = None
@@ -77,18 +68,18 @@ class TrafficSignDetector:
         # Blob from current frame -> this preprocessing the image to be normalized, resized and converts into RGB
         blob = cv2.dnn.blobFromImage(frame, 1 / 255.0, (416, 416), swapRB=True, crop=False)
 
-        # Forward pass with blob through output layers
+        # Forward pass with blob
         self.network.setInput(blob)
         output_from_network = self.network.forward(self.layers_names_output)
 
-        # Lists for detected bounding boxes, confidences and class's number
+        # array for detected bounding boxes, confidences and class number
         bounding_boxes = []
         confidences = []
         class_numbers = []
 
-        # Going through all output layers after feed forward pass
+        # output layers after feed forward pass
         for result in output_from_network:
-            # Going through all detections from current output layer
+            # all detections from current output layer
             for detected_objects in result:
                 # class probabilities
                 scores = detected_objects[5:]
@@ -116,7 +107,7 @@ class TrafficSignDetector:
         # this will get only the relevant bounding boxes (there might be more which crosses each other, and etc)
         results = cv2.dnn.NMSBoxes(bounding_boxes, confidences, self.probability_minimum, self.threshold)
 
-        # Checking if there is any detected object been left
+        # if there are detected objects, then these can be forward to the recognition phase
         if len(results) > 0:
 
             for i in results.flatten():

@@ -243,25 +243,26 @@ class Lane:
             lkf = int(self.left_kalmanFilter.get_position())
 
             if 200 < lkf < midpoint:
-                leftx_current = lkf #- 25
+                leftx_current = lkf
             else:
                 maxl = int(np.mean(nonzerox[good_left_inds]))
                 avgl = int((lkf + maxl) / 2)
                 leftx_current = avgl
 
-            #leftx_current = int(np.mean(nonzerox[good_left_inds])) # comment out to test without Kalman filter
             left_end = win_y_high
+            #leftx_current = int(np.mean(nonzerox[good_left_inds])) # comment out to test without Kalman filter
         if len(good_right_inds) > minpix:
             self.right_kalmanFilter.update(leftx_current)
             rkf = int(self.right_kalmanFilter.get_position())
             if midpoint < rkf < 860:
-                rightx_current = rkf #+ 25
+                rightx_current = rkf
             else:
                 maxr = int(np.mean(nonzerox[good_right_inds]))
                 avgr = int((rkf + maxr) / 2)
                 rightx_current = avgr
-            #rightx_current = int(np.mean(nonzerox[good_right_inds])) # comment out to test without Kalman filter
+
             right_end = win_y_high
+            #rightx_current = int(np.mean(nonzerox[good_right_inds])) # comment out to test without Kalman filter
 
         return rightx_current, leftx_current, left_end, right_end
 
@@ -637,9 +638,7 @@ class WindowFilter:
 
     def update(self, pos):
         """
-        Given an estimate x position, uses the kalman filter to estimate the most likely true position of the
-        lane pixel.
-        :param pos: measured x position of the pixel
+        Estimates the sliding window position given the measured x point
         """
         self.kf.predict()
         self.kf.update(pos)

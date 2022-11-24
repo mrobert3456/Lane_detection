@@ -47,13 +47,8 @@ class ImgThreshold:
 
     def img_thres(self,img):
         """
-                Takes a road image and returns an image where pixel intensity maps to likelihood of it being part of the lane.
-                Each pixel gets its own score, stored as pixel intensity. An intensity of zero means it is not from the lane,
-                and a higher score means higher confidence of being from the lane.
-                :param img: an image of a road, typically from an overhead perspective.
-                :return: The score image.
-                """
-        # {'name': 'lab_b', 'cspace': 'LAB', 'channel': 2, 'clipLimit': 1.0, 'threshold': 180},
+            Thresholds the given image
+        """
         # Thresholding settings
         settings = [{'cspace': 'HLS', 'channel': 1, 'clipLimit': 2.0, 'threshold': 210},
                     {'cspace': 'HSV', 'channel': 2, 'clipLimit': 2.0, 'threshold': 220}]
@@ -75,11 +70,6 @@ class ImgThreshold:
 
             scores += binary
 
-            # Save images
-            #self.viz_save(params['name'], gray)
-            #self.viz_save(params['name'] + '_binary', binary)
-
         res= cv.normalize(scores, None, 0, 255, cv.NORM_MINMAX)
-        #canny =  cannyimg = cv.Canny(res, 150, 200)
 
         return res

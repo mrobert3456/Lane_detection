@@ -6,6 +6,8 @@ from Lane import LaneHistory
 from Perspective_transform import Perspective
 from Threshold import ImgThreshold
 from TrafficSign_recognition import TrafficSignDetector
+from tqdm import tqdm
+import time
 import numpy as np
 
 perspective =Perspective()
@@ -14,11 +16,12 @@ laneProcess = Lane(perspective)
 Thresholder =ImgThreshold()
 SignDetector = TrafficSignDetector()
 GoodLane = True
-capture = cv.VideoCapture('ts_test2.mp4')
+firstLane=True
+capture = cv.VideoCapture('higwaytest.mp4')
 # FPS counter
 counter = 0
 fps_start = timer()
-firstLane=True
+
 
 def Detect_lane(image):
 
@@ -37,9 +40,9 @@ def Detect_lane(image):
     #Perspective transform
     warped = perspective.perspective_transform(combined_img, s_mask, dest_mask)
 
-
     global GoodLane
-    global  firstLane
+    global firstLane
+
 
     #if the lane is good then the marginsize =50, else marginsize=100
 
@@ -70,7 +73,7 @@ def Detect_lane(image):
 
     else:
         GoodLane = False
-
+        # if detection error count is above 20
         if laneHistory.getError()>20:
             laneHistory.setError(0)
             firstLane=True
@@ -93,17 +96,20 @@ def Detect_lane(image):
     return result
 
 writer = None
+global frameArray
+frameArray = []
 
 while capture.isOpened():
     #ret, frame1 = capture.read()
-    ret2, frame = capture.read()
-
+    ret, frame = capture.read()
+    if not ret:
+        break
 
     # if frame is read correctly ret is True
     frame =cv.resize(frame,(1280,720))
     frame =SignDetector.DetectSign(frame)
     frame = Detect_lane(frame)
-
+    frameArray.append(frame)
     cv.imshow('frame', frame)
 
     counter += 1
@@ -120,16 +126,27 @@ while capture.isOpened():
         counter = 0
         # Restart timer for FPS
         fps_start = timer()
-
-        if writer is None:
-            fourcc = cv.VideoWriter_fourcc(*'mp4v')
-            writer = cv.VideoWriter('result_higway.mp4', fourcc, 20,
-                                     (frame.shape[1], frame.shape[0]), True)
-        writer.write(frame)
-
     if cv.waitKey(1) & 0xFF == ord('q'):
         break
-
 capture.release()
-writer.release()
+
 cv.destroyAllWindows()
+print("writing video ")
+fpsCount=25
+def writeVideo():
+    fourcc = cv.VideoWriter_fourcc(*'mp4v')
+    writer = cv.VideoWriter('result_higwaytest.mp4', fourcc, fpsCount,
+                            (1280, 720), True)
+    print(len(frameArray))
+    start=0
+    for i in range(0,len(frameArray)):
+
+        if((start+fpsCount)<len(frameArray)-1):
+            end=start+fpsCount
+            for j in tqdm(range(start,end)):
+                writer.write(frameArray[j])
+
+        start=start+fpsCount
+    writer.release()
+writeVideo()
+print("done")

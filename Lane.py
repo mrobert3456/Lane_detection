@@ -17,7 +17,7 @@ class LaneHistory:
         self.lane_width = []
         self.center_off = []
         self.errorCount = 0
-        self.steering_angle=0
+        self.steering_angle=90
         self.ploty = None
 
     def getError(self):
@@ -39,22 +39,10 @@ class LaneHistory:
     def getRightFit(self):
         return self.right_fit
 
-    def getWidth(self):
-        return self.lane_width[-1]
-
-    def getLeftCurve(self):
-        return self.left_curverad[-1]
-
-    def getRightCurve(self):
-        return self.right_curverad[-1]
-
-    def getCenterOff(self):
-        return self.center_off[-1]
-
     def putHistoryDataOnScreen(self, img):
         # Show position
 
-        lane_position_prcnt = self.getCenterOff() / self.lane_width
+        lane_position_prcnt = self.center_off[-1] / self.lane_width
 
         x_text_start, y_text_start = (10, 450)
         line_start = (10 + x_text_start, 40 + y_text_start)
@@ -356,7 +344,6 @@ class Lane:
 
     def drawLines(self, img_w, perspective, color):
         """ Draws the lane to the original image"""
-        # img =self.image
         # Creates an image to draw the lines on
         if self.canDraw:
             warp_zero = np.zeros_like(img_w).astype(np.uint8)
@@ -565,25 +552,17 @@ class Lane:
 
     def sanityCheck(self):
         """Decides whether the detected lane is valid or not"""
-        #return True
-        # print("---------------------------------------------------")
+
         if self.canDraw:
-            #return True
             if self.lane_width > 3.8 or self.lane_width < 2.8:
-                #print("LANE WIDTH FAIL: " +str(self.lane_width))
                 return False
             if self.right_curverad < 300 or self.left_curverad < 300 or self.right_curverad > 15000 or self.left_curverad > 15000:
-                #print("RIGHT CURVARAD FAIL: "+ str(self.right_curverad))
-                #print("LEFT CURVARAD FAIL: " + str(self.left_curverad))
                 return False
             if self.radius > 4 or self.radius < 0.2:
-                #print("RADIUS FAIL: "  +str(self.radius))
                 return False
-            # if self.center_off<0:
-            #    return  False
+
             return True
         else:
-            # print("CANT DRAW")
             return False
 
     def regionOfInterest(self, img):

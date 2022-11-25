@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-import h5py
 import cv2
 from tensorflow.keras.models import load_model
 

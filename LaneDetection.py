@@ -10,11 +10,11 @@ class LaneDetection:
         self.laneHistory = LaneHistory()
         self.laneProcess = Lane(self.perspective)
         self.Thresholder = ImgThreshold()
-        #self.SignDetector = TrafficSignDetector()
         self.GoodLane = True
         self.firstLane = True
         self.useHistory = useHistory
         self.laneProcess.setUseKalman(useKalman)
+
     def detectLane(self, image):
         self.laneProcess.SetImg(image)
         self.perspective.setImg(image)
@@ -31,16 +31,16 @@ class LaneDetection:
         # Perspective transform
         warped = self.perspective.perspective_transform(combined_img, s_mask, dest_mask)
 
-        global usedHistory
+        global usedHistory  # determin whether history data was used
         usedHistory = False
 
         # if the lane is good then the marginsize =50, else marginsize=100
         if self.GoodLane:
             left_fit, right_fit, outimg, left_lane_inds, right_lane_inds = self.laneProcess.slidingWindown(warped,
-                                                                                                      marginsize=25)  # returns the right and the left lane lines points
+                                                                                                           marginsize=25)  # returns the right and the left lane lines points
         else:
             left_fit, right_fit, outimg, left_lane_inds, right_lane_inds = self.laneProcess.slidingWindown(warped,
-                                                                                                      marginsize=50)  # returns the right and the left lane lines points
+                                                                                                           marginsize=50)  # returns the right and the left lane lines points
 
         # draw detection steps results to the input frame
         drawn_lines_regions = self.laneProcess.drawLaneLinesRegions(warped)
@@ -56,9 +56,11 @@ class LaneDetection:
             result = raw_lane
             if validLane:  # good lanes are added to the history
                 self.GoodLane = True
-                self.laneHistory.setHistory(0, left_fit, right_fit, self.laneProcess.getLeftCurve(), self.laneProcess.getRightCurve(),
-                                       self.laneProcess.getCenterOff(), self.laneProcess.getWidth(), self.laneProcess.getRadius(),
-                                       self.laneProcess.getPloty(), self.laneProcess.getDirection())
+                self.laneHistory.setHistory(0, left_fit, right_fit, self.laneProcess.getLeftCurve(),
+                                            self.laneProcess.getRightCurve(),
+                                            self.laneProcess.getCenterOff(), self.laneProcess.getWidth(),
+                                            self.laneProcess.getRadius(),
+                                            self.laneProcess.getPloty(), self.laneProcess.getDirection())
                 self.laneProcess.putDatasOnScreen(result)
                 result = self.laneProcess.displayHeadingLine(result, self.laneProcess.getDirection())
             self.firstLane = False
@@ -76,8 +78,9 @@ class LaneDetection:
             # if history has data
             if len(self.laneHistory.getLeftFit()) > 0 and len(self.laneHistory.getRightFit()) > 0:
                 result = self.laneProcess.drawLinesFromHistory(warped, self.laneHistory.getLeftFit()[-1],
-                                                          self.laneHistory.getRightFit()[-1], self.laneHistory.ploty,
-                                                          perspective=[s_mask, dest_mask], color=(0, 255, 255))
+                                                               self.laneHistory.getRightFit()[-1],
+                                                               self.laneHistory.ploty,
+                                                               perspective=[s_mask, dest_mask], color=(0, 255, 255))
                 self.laneHistory.incrementError()
                 result = self.laneProcess.displayHeadingLine(result, self.laneHistory.getDirection())
                 self.laneHistory.putHistoryDataOnScreen(result)
@@ -86,7 +89,7 @@ class LaneDetection:
                 usedHistory = False
                 result = image
         else:
-            usedHistory=False
+            usedHistory = False
         roi_og = self.laneProcess.regionOfInterest(image)
         warped_or = self.perspective.perspective_transform(roi_og, s_mask, dest_mask)
         self.laneProcess.combineImages(result, outimg, drawn_hotspots, drawn_lines_regions, warped_or, raw_lane)

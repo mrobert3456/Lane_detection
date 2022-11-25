@@ -3,20 +3,20 @@ import numpy as np
 import cv2
 from tensorflow.keras.models import load_model
 
+
 class TrafficSignDetector:
     def __init__(self):
         self.model = load_model('ts/model_1_ts_gray.h5')
 
         self.model.load_weights('ts/w_1_dataset_ts_gray_norm.h5')
 
-        self.labels = pd.read_csv('osztalyok.csv', sep=',',encoding='latin-1')
+        self.labels = pd.read_csv('osztalyok.csv', sep=',', encoding='latin-1')
         self.labels = np.array(self.labels.loc[:, 'SignName']).flatten()
 
         # open dataset -> it is only needed for the mean subraction dataset, or for std dataset
-        #with h5py.File('ts/mean_rgb_dataset_ts.hdf5', 'r') as f:
+        # with h5py.File('ts/mean_rgb_dataset_ts.hdf5', 'r') as f:
         #    self.mean_rgb = f['mean']  # HDF5 dataset
         #    self.mean_rgb = np.array(self.mean_rgb)  # Numpy arrays
-
 
         # ----------------------darknet------------------------
 
@@ -30,28 +30,27 @@ class TrafficSignDetector:
         # bounding boxes threshold for non-maximum suppression
         self.threshold = 0.2
 
-        #getting the outpout layers of yolov3
-        #YOLO v3 layer names
+        # getting the outpout layers of yolov3
+        # YOLO v3 layer names
         self.layers_all = self.network.getLayerNames()
         # index of output layers
         self.layers_names_output = [self.layers_all[i - 1] for i in self.network.getUnconnectedOutLayers()]
 
-        #writer = None
+        # writer = None
         self.h, self.w = None, None
 
-    def ROI(self,img):
+    def ROI(self, img):
         """Gets the ROI from the image"""
         mask = np.zeros_like(img)
 
         imshape = img.shape
 
         vertices = np.array(
-            [[(0, imshape[0]*0.5), (imshape[1]*.1 , imshape[0]*.1 ), (imshape[1]*.8 , imshape[0]*.1),
-              (imshape[1], imshape[0]*0.5)]], dtype=np.int32)  # creates an array with the trapezoids verticies
+            [[(0, imshape[0] * 0.5), (imshape[1] * .1, imshape[0] * .1), (imshape[1] * .8, imshape[0] * .1),
+              (imshape[1], imshape[0] * 0.5)]], dtype=np.int32)  # creates an array with the trapezoids verticies
 
         cv2.fillPoly(mask, vertices, (255,) * 3)
         masked_image = cv2.bitwise_and(img, mask)  # crops the original image with the mask
-
 
         return masked_image
 
@@ -103,9 +102,10 @@ class TrafficSignDetector:
         # this will get only the relevant bounding boxes (there might be more which crosses each other, and etc)
         results = cv2.dnn.NMSBoxes(bounding_boxes, confidences, self.probability_minimum, self.threshold)
         return results, bounding_boxes, confidences
-    def recognizeTrafficSign(self,img):
+
+    def recognizeTrafficSign(self, img):
         frame = self.ROI(img)
-        results, bounding_boxes,confidences = self.detectTrafficSign(frame)
+        results, bounding_boxes, confidences = self.detectTrafficSign(frame)
         # if there are detected objects, then these can be forward to the recognition phase
         if len(results) > 0:
 
@@ -121,8 +121,8 @@ class TrafficSignDetector:
                 else:
                     # Blob from current frame -> this preprocessing the image to be normalized, resized and converts into RGB
                     blob_ts = cv2.dnn.blobFromImage(c_ts, 1 / 255.0, size=(48, 48), swapRB=True, crop=False)
-                    #blob_ts[0] = blob_ts[0, :, :, :] - self.mean_rgb # only needed for mean subtraction
-                    #blob_ts[0] = blob_ts[0, :, :, :] / self.std_rgb # only needed for std
+                    # blob_ts[0] = blob_ts[0, :, :, :] - self.mean_rgb # only needed for mean subtraction
+                    # blob_ts[0] = blob_ts[0, :, :, :] / self.std_rgb # only needed for std
                     blob_ts = blob_ts.transpose(0, 2, 3, 1)
 
                     # CONVERTING GRAY, CAN BE OMITTED IF YOU ARE USING RGB MODELL
@@ -131,7 +131,6 @@ class TrafficSignDetector:
                     blob_ts = cv2.cvtColor(blob_ts, cv2.COLOR_RGB2GRAY)  # shape (48,48)
 
                     blob_ts = blob_ts[np.newaxis, :, :, np.newaxis]  # shape (1,48,48,1)
-
 
                     scores = self.model.predict(blob_ts)
 
@@ -143,11 +142,9 @@ class TrafficSignDetector:
                                   (x_min + box_width, y_min + box_height),
                                   (0, 255, 0), 2)
 
-
                     text_box_current = '{}: {:.4f}'.format(self.labels[prediction],
                                                            confidences[i])
 
-
                     cv2.putText(img, text_box_current, (x_min, y_min - 5),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,255), 2)
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
         return img, results

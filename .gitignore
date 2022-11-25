@@ -134,3 +134,7 @@ detection_training/
 #test videos
 *.mp4
 
+tesztkepek/
+tesztLane/
+tesztTSR/
+

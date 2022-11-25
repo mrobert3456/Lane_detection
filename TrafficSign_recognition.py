@@ -56,11 +56,10 @@ class TrafficSignDetector:
 
         return masked_image
 
-    def DetectSign(self,img):
+    def detectTrafficSign(self, frame):
         """
-        Detection traffic signs in the input image
-        """
-        frame = self.ROI(img)
+                Detection traffic signs in the input image
+                """
         if self.w is None or self.h is None:
             # Slicing two elements from tuple
             h, w = frame.shape[:2]
@@ -88,7 +87,6 @@ class TrafficSignDetector:
                 # Getting probability values for current class
                 confidence_current = scores[class_current]
 
-
                 if confidence_current > self.probability_minimum:
                     # Scaling bounding box coordinates to the initial frame size
                     box_current = detected_objects[0:4] * np.array([w, h, w, h])
@@ -98,7 +96,6 @@ class TrafficSignDetector:
                     x_min = int(x_center - (box_width / 2))
                     y_min = int(y_center - (box_height / 2))
 
-
                     bounding_boxes.append([x_min, y_min, int(box_width), int(box_height)])
                     confidences.append(float(confidence_current))
                     class_numbers.append(class_current)
@@ -106,7 +103,10 @@ class TrafficSignDetector:
         # Implementing non-maximum suppression of given bounding boxes
         # this will get only the relevant bounding boxes (there might be more which crosses each other, and etc)
         results = cv2.dnn.NMSBoxes(bounding_boxes, confidences, self.probability_minimum, self.threshold)
-
+        return results, bounding_boxes, confidences
+    def recognizeTrafficSign(self,img):
+        frame = self.ROI(img)
+        results, bounding_boxes,confidences = self.detectTrafficSign(frame)
         # if there are detected objects, then these can be forward to the recognition phase
         if len(results) > 0:
 
@@ -151,4 +151,4 @@ class TrafficSignDetector:
 
                     cv2.putText(img, text_box_current, (x_min, y_min - 5),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,255), 2)
-        return img
+        return img, results

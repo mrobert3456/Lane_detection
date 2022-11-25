@@ -112,6 +112,14 @@ class Lane:
         self.ploty = 600
         self.direction=None
         self.steering_angle=90
+        self.useKalman = True
+
+    def getCanDraw(self):
+        return self.canDraw
+
+    def setUseKalman(self, value):
+        self.useKalman=value
+        return
     def SetImg(self, img):
         self.image = img
         return
@@ -238,7 +246,8 @@ class Lane:
                 leftx_current = avgl
 
             left_end = win_y_high
-            #leftx_current = int(np.mean(nonzerox[good_left_inds])) # comment out to test without Kalman filter
+            if not(self.useKalman):
+                leftx_current = int(np.mean(nonzerox[good_left_inds])) # comment out to test without Kalman filter
         if len(good_right_inds) > minpix:
             self.right_kalmanFilter.update(leftx_current)
             rkf = int(self.right_kalmanFilter.get_position())
@@ -250,7 +259,8 @@ class Lane:
                 rightx_current = avgr
 
             right_end = win_y_high
-            #rightx_current = int(np.mean(nonzerox[good_right_inds])) # comment out to test without Kalman filter
+            if not (self.useKalman):
+                rightx_current = int(np.mean(nonzerox[good_right_inds])) # comment out to test without Kalman filter
 
         return rightx_current, leftx_current, left_end, right_end
 

@@ -1,10 +1,9 @@
 import math
-
 import numpy as np
 import cv2 as cv
 from filterpy.common import Q_discrete_white_noise
-from filterpy.kalman import KalmanFilter, dot, logpdf
-from scipy.ndimage.filters import gaussian_filter
+from filterpy.kalman import KalmanFilter
+
 
 
 class LaneHistory:
@@ -66,7 +65,7 @@ class LaneHistory:
                   color=(255, 255, 255))
 
         # print to image
-        text = "radius = %s [m]\nwidth = %s [m]\nLeft_curve = %s\nRight_curve = %s\nSteering_angle = %s [degree]" % (
+        text = "radius = %s [m]\nwidth = %s [m]\nLeft_curve = %s [m]\nRight_curve = %s [m]\nSteering_angle = %s [degree]" % (
             str(self.radius), str(self.lane_width), str(self.left_curverad[-1]),
             str(self.right_curverad[-1]), str(self.steering_angle))
         for i, line in enumerate(text.split('\n')):
@@ -179,7 +178,7 @@ class Lane:
                   radius=8,
                   color=(255, 255, 255))
 
-        text = "radius = %s [m]\nwidth = %s [m]\nLeft_curve = %s\nRight_curve = %s\nSteering_angle = %s [degree]" % (
+        text = "radius = %s [m]\nwidth = %s [m]\nLeft_curve = %s [m]\nRight_curve = %s [m]\nSteering_angle = %s [degree]" % (
             str(self.radius), str(self.lane_width), str(self.left_curverad),
             str(self.right_curverad), str(self.steering_angle))
         for i, line in enumerate(text.split('\n')):

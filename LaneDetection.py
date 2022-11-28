@@ -15,6 +15,11 @@ class LaneDetection:
         self.useHistory = useHistory
         self.laneProcess.setUseKalman(useKalman)
 
+    def setKalmanHistory(self, KalmanV, HistoryV):
+        self.useHistory = HistoryV
+        self.laneProcess.setUseKalman(KalmanV)
+        return
+
     def detectLane(self, image):
         self.laneProcess.SetImg(image)
         self.perspective.setImg(image)

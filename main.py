@@ -19,7 +19,7 @@ def processVideo(video):
     capture = cv.VideoCapture(video)
 
     while capture.isOpened():
-        ret1, frame1 = capture.read()
+        #ret1, frame1 = capture.read()
         ret, frame = capture.read()
         if not ret:
             break
@@ -29,6 +29,7 @@ def processVideo(video):
         frame, results = SignDetector.recognizeTrafficSign(frame)
         frame, validLane, usedHist = LaneDetector.detectLane(frame)
         frameArray.append(frame)
+
         cv.imshow('frame', frame)
 
         counter += 1
@@ -72,5 +73,5 @@ def writeVideo(resVideoName):
 
 
 processVideo('ts_test2.mp4')
-# writeVideo('result_tstest.mp4')
+writeVideo('result_tstest.mp4')
 print("done")

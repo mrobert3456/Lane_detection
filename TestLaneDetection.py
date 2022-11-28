@@ -10,6 +10,7 @@ def testLaneDetection(video, savePath, maxFrameCount, useKalman=True, useHistory
     reads a video input and detects the Lane
     splits the results into 'Valid' and 'Invalid' folders according to the results
     """
+    LaneDetector.setKalmanHistory(useKalman,useHistory)
     subName = ''
     if higwayTest:
         subName = 'higway_road/'
@@ -62,6 +63,6 @@ def testLaneDetection(video, savePath, maxFrameCount, useKalman=True, useHistory
 
 testLaneDetection('ts_test2.mp4', 'tesztLane/', 1374, higwayTest=False)
 
-testLaneDetection('higwaytest.mp4', 'tesztLane/', 900, useKalman=False, higwayTest=True)
-testLaneDetection('higwaytest.mp4', 'tesztLane/', 900, useHistory=False, higwayTest=True)
-testLaneDetection('higwaytest.mp4', 'tesztLane/', 900, higwayTest=True)
+testLaneDetection('higwaytest.mp4', 'tesztLane/', 900, useKalman=False, higwayTest=True) #only history
+testLaneDetection('higwaytest.mp4', 'tesztLane/', 900, useHistory=False, higwayTest=True) #only kalman
+testLaneDetection('higwaytest.mp4', 'tesztLane/', 900, higwayTest=True) #both

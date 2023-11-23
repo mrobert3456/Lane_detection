@@ -1,18 +1,19 @@
+import sys
+
 import cv2 as cv
 from timeit import default_timer as timer
 from TrafficSign_recognition import TrafficSignDetector
 from LaneDetection import LaneDetection
 from tqdm import tqdm
 
-SignDetector = TrafficSignDetector()
-LaneDetector = LaneDetection(useKalman=True, useHistory=True)
+
 
 writer = None
 global frameArray
 frameArray = []
 
 
-def processVideo(video):
+def processVideo(video, includeTsr=False):
     # FPS counter
     counter = 0
     fps_start = timer()
@@ -26,7 +27,8 @@ def processVideo(video):
 
         # if frame is read correctly ret is True
         frame = cv.resize(frame, (1280, 720))
-        frame, results = SignDetector.recognizeTrafficSign(frame)
+        if includeTsr:
+            frame, results = SignDetector.recognizeTrafficSign(frame)
         frame, validLane, usedHist = LaneDetector.detectLane(frame)
         frameArray.append(frame)
 
@@ -72,6 +74,21 @@ def writeVideo(resVideoName):
     writer.release()
 
 
-processVideo('ts_test2.mp4')
-writeVideo('result_tstest.mp4')
-print("done")
+if __name__ == '__main__':
+
+    LaneDetector = LaneDetection(useKalman=True, useHistory=True)
+    argCount = len(sys.argv)
+
+    inputFile = str(sys.argv[1]) if argCount >= 2 else 'higwaytest.mp4'
+    includeTsr = str(sys.argv[2]) if argCount >= 3 else 'lane' #combined
+    outputFile = str(sys.argv[3]) if argCount >= 4 else 'output.mp4'
+
+    if includeTsr=='combined':
+        SignDetector = TrafficSignDetector()
+        processVideo(inputFile, True)
+
+    else:
+        processVideo(inputFile)
+
+    writeVideo(outputFile)
+    print("done")

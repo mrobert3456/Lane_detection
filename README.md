@@ -30,13 +30,13 @@ This project utilizes the following packages:
 * Numpy
 * Pandas
 * h5py
-* [Tensorflow](https://www.tensorflow.org/install/pip)
+* [Tensorflow-gpu](https://www.tensorflow.org/install/pip)
 * [Filterpy](https://filterpy.readthedocs.io/en/latest/)
 
 To setup the environment,you need to install [conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html), then run the following commands:
 ```
 conda env create -f environment.yaml
-activate GPU_ENV
+conda activate GPU_ENV
 ```
 
 

@@ -6,9 +6,27 @@
 ![project_video_clip](./data/output_combined.gif)
 
 
+# How it works
+
+## Lane detection overview
+<p align="center">
+  <img src="./data/lane_overview.png" alt="Alt text">
+</p>
+
+1. **Get the current frame** from the video.
+2. **Get the Region Of Interest** from the retrieved frame
+3. **Apply thresholding** to supress background noise
+   * **HLS** thresholding
+   * **HSV** thresholding
+4. **Combine the results** of the previous two thresholding
+5. **Apply perspective transformation**
+6. **Sliding window search** to detect lane pixels
+7. **Draw polynomial** on the filtered windows
+8. **Sanity check** to save valid lanes for a few consequent frames and reuse it if necessary
+
 For detailed description of how it works, please check out my publication on IEEE:
 https://ieeexplore.ieee.org/abstract/document/10158539
-
+---
 # Installation
 
 ## This Repository
@@ -39,7 +57,7 @@ conda env create -f environment.yaml
 conda activate GPU_ENV
 ```
 
-
+---
 # Usage
 
 ## Standard usage

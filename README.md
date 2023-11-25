@@ -9,7 +9,10 @@
 # How it works
 
 ## Lane detection overview
-![lane_overview](./data/lane_overview.png)
+<p align="center">
+  <img src="./data/lane_overview.png">
+</p>
+
 
 1. **Get the current frame** from the video.
 2. **Get the Region Of Interest** from the retrieved frame
@@ -20,7 +23,7 @@
 5. **Apply perspective transformation**
 6. **Sliding window search** to detect lane pixels
 7. **Draw polynomial** on the filtered windows
-8. **Sanity check** to save valid lanes for a few consequent frames and reuse it if necessary
+8. **Sanity check** to save valid lanes for a few consequent frames and reuse it if the sanity check fails
 
 For detailed description of how it works, please check out my publication on IEEE:
 https://ieeexplore.ieee.org/abstract/document/10158539

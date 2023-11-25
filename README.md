@@ -9,9 +9,7 @@
 # How it works
 
 ## Lane detection overview
-<p align="center">
-  <img src="./data/lane_overview.png" alt="Alt text">
-</p>
+![lane_overview](./data/lane_overview.png)
 
 1. **Get the current frame** from the video.
 2. **Get the Region Of Interest** from the retrieved frame
@@ -57,7 +55,7 @@ conda env create -f environment.yaml
 conda activate GPU_ENV
 ```
 
----
+
 # Usage
 
 ## Standard usage

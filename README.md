@@ -6,7 +6,7 @@
 ![project_video_clip](./data/output_combined.gif)
 
 
-# How it works
+# ⚙ How it works
 
 ## Lane detection overview
 <p align="center">
@@ -28,7 +28,7 @@
 For detailed description of how it works, please check out my publication on IEEE:
 https://ieeexplore.ieee.org/abstract/document/10158539
 ---
-# Installation
+# 📦 Installation
 
 ## This Repository
 
@@ -39,7 +39,7 @@ git clone https://github.com/mrobert3456/Lane_detection.git
 cd Lane_detection
 ```
 
-## Software Dependencies
+## ⚡ Software Dependencies
 
 This project utilizes the following packages:
 
@@ -59,7 +59,7 @@ conda activate GPU_ENV
 ```
 
 
-# Usage
+# 🚀 Usage
 
 ## Standard usage
 
